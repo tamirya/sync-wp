@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+:root {
+  /* Page & text */
+  --background: #f0f4f8;
+  --foreground: #0f172a;
+
+  /* Surfaces */
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+
+  /* Muted / secondary */
+  --muted: #64748b;
+  --muted-bg: #eef2f7;
+
+  /* Borders & focus */
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #003d99;
+
+  /* Brand */
+  --primary: #0a3a7a;
+  --primary-foreground: #ffffff;
+  --accent: #2563eb;
+  --accent-foreground: #ffffff;
+
+  /* Semantic */
+  --success: #15803d;
+  --success-foreground: #ffffff;
+  --success-muted: #dcfce7;
+  --warning: #d97706;
+  --warning-muted: #fef3c7;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --destructive-muted: #fee2e2;
+
+  /* App shell */
+  --shell-sidebar: #ffffff;
+  --shell-sidebar-foreground: #0f172a;
+  --shell-sidebar-muted: #64748b;
+  --shell-sidebar-border: #e2e8f0;
+  --shell-sidebar-accent: #f1f5f9;
+  --shell-sidebar-active: #e8f1fc;
+  --shell-sidebar-active-border: #0a3a7a;
+  --shell-topbar: #ffffff;
+  --shell-topbar-border: #e2e8f0;
+  --shell-topbar-muted: #64748b;
+
+  /* Layout */
+  --radius-card: 1rem;
+  --radius-lg: 0.875rem;
+  --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-card-hover: 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-bg: var(--muted-bg);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-muted: var(--success-muted);
+  --color-warning: var(--warning);
+  --color-warning-muted: var(--warning-muted);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-muted: var(--destructive-muted);
+  --color-shell-sidebar: var(--shell-sidebar);
+  --color-shell-sidebar-foreground: var(--shell-sidebar-foreground);
+  --color-shell-sidebar-muted: var(--shell-sidebar-muted);
+  --color-shell-sidebar-border: var(--shell-sidebar-border);
+  --color-shell-sidebar-accent: var(--shell-sidebar-accent);
+  --color-shell-sidebar-active: var(--shell-sidebar-active);
+  --color-shell-sidebar-active-border: var(--shell-sidebar-active-border);
+  --color-shell-topbar: var(--shell-topbar);
+  --color-shell-topbar-border: var(--shell-topbar-border);
+  --color-shell-topbar-muted: var(--shell-topbar-muted);
+  --radius-card: var(--radius-card);
+  --radius-lg: var(--radius-lg);
+  --shadow-card: var(--shadow-card);
+  --shadow-card-hover: var(--shadow-card-hover);
+  --font-sans: var(--font-heebo), var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}

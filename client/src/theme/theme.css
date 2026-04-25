@@ -1,0 +1,61 @@
+/**
+ * Appiz — global design tokens (colors, radii, shadows).
+ * עריכה כאן; globals.css ממפה ל-Tailwind.
+ */
+
+:root {
+  /* Page & text */
+  --background: #f0f4f8;
+  --foreground: #0f172a;
+
+  /* Surfaces */
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+
+  /* Muted / secondary */
+  --muted: #64748b;
+  --muted-bg: #eef2f7;
+
+  /* Borders & focus */
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #003d99;
+
+  /* Brand */
+  --primary: #0a3a7a;
+  --primary-foreground: #ffffff;
+  --accent: #2563eb;
+  --accent-foreground: #ffffff;
+
+  /* Semantic */
+  --success: #15803d;
+  --success-foreground: #ffffff;
+  --success-muted: #dcfce7;
+  --warning: #d97706;
+  --warning-muted: #fef3c7;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --destructive-muted: #fee2e2;
+
+  /* App shell */
+  --shell-sidebar: #ffffff;
+  --shell-sidebar-foreground: #0f172a;
+  --shell-sidebar-muted: #64748b;
+  --shell-sidebar-border: #e2e8f0;
+  --shell-sidebar-accent: #f1f5f9;
+  /* Softer “selected” wash (pale blue) */
+  --shell-sidebar-active: #e8f1fc;
+  --shell-sidebar-active-border: #0a3a7a;
+  --shell-topbar: #ffffff;
+  --shell-topbar-border: #e2e8f0;
+  --shell-topbar-muted: #64748b;
+
+  /* Layout */
+  --radius-card: 1rem;
+  --radius-lg: 0.875rem;
+  --shadow-card:
+    0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-card-hover: 0 4px 14px rgba(15, 23, 42, 0.08);
+}
