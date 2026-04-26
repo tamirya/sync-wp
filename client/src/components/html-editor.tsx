@@ -73,7 +73,7 @@ export function HtmlEditor({
   useEffect(() => {
     if (!editor) return;
     if (editor.getHTML() !== initialValue) {
-      editor.commands.setContent(initialValue, false);
+      editor.commands.setContent(initialValue);
       setHtml(initialValue);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
