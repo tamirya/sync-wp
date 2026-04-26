@@ -102,3 +102,44 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
 }
+
+/* TipTap rich-text editor content */
+.tiptap-content p {
+  margin: 0.25rem 0;
+}
+.tiptap-content h2 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0.5rem 0 0.25rem;
+}
+.tiptap-content h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0.5rem 0 0.25rem;
+}
+.tiptap-content ul {
+  list-style: disc;
+  padding-inline-start: 1.25rem;
+  margin: 0.25rem 0;
+}
+.tiptap-content ol {
+  list-style: decimal;
+  padding-inline-start: 1.25rem;
+  margin: 0.25rem 0;
+}
+.tiptap-content strong {
+  font-weight: 700;
+}
+.tiptap-content em {
+  font-style: italic;
+}
+.tiptap-content s {
+  text-decoration: line-through;
+}
+.tiptap-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--muted);
+  pointer-events: none;
+  float: inline-start;
+  height: 0;
+}

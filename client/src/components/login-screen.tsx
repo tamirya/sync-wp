@@ -5,10 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import type { Locale } from "@/i18n/config";
 import { apiLogin } from "@/lib/api";
-import {
-  translateLoginApiError,
-  type LoginMessages,
-} from "@/messages/login";
+import { translateLoginApiError, type LoginMessages } from "@/messages/login";
 
 function SyncLogo({ className }: { className?: string }) {
   return (
@@ -104,7 +101,11 @@ function ArrowIcon({ className }: { className?: string }) {
       strokeWidth="2"
       aria-hidden
     >
-      <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M5 12h14M13 6l6 6-6 6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -149,8 +150,7 @@ function LocaleSwitcher({ locale }: { locale: Locale }) {
   const rest = pathname.replace(/^\/(he|en)/, "") || "/";
   const href = `/${other}${rest === "/" ? "/login" : rest}`;
 
-  const label =
-    locale === "he" ? "English" : "עברית";
+  const label = locale === "he" ? "English" : "עברית";
 
   return (
     <Link
@@ -169,11 +169,7 @@ type Props = {
   redirectAfterLogin?: string | null;
 };
 
-export function LoginScreen({
-  locale,
-  messages,
-  redirectAfterLogin,
-}: Props) {
+export function LoginScreen({ locale, messages, redirectAfterLogin }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -209,13 +205,14 @@ export function LoginScreen({
       <DecorativeLines />
 
       <div className="relative z-[1] flex min-h-dvh flex-col items-center px-4 py-10 sm:py-16">
-        <header className="mb-8 flex w-full max-w-md flex-col items-center gap-2 text-center sm:mb-10">
-          <div className="flex items-center gap-3">
-            <SyncLogo className="h-11 w-11 shrink-0" />
-            <span className="text-2xl font-bold tracking-tight text-primary">
-              {messages.brand}
-            </span>
-          </div>
+        <header className="flex w-full max-w-md flex-col items-center gap-3 text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/login-logo.svg"
+            alt={messages.brand}
+            className="h-[300px] w-auto"
+            draggable={false}
+          />
           <p className="max-w-sm text-sm text-muted">{messages.tagline}</p>
           <div className="mt-1">
             <LocaleSwitcher locale={locale} />
@@ -223,7 +220,7 @@ export function LoginScreen({
         </header>
 
         <div className="w-full max-w-[min(100%,28rem)] rounded-3xl border border-border/60 bg-card p-6 shadow-[0_4px_24px_rgba(15,23,42,0.06)] sm:p-8">
-          <div className="mb-6 text-start">
+          <div className="text-start">
             <h1 className="text-xl font-bold text-card-foreground sm:text-2xl">
               {messages.title}
             </h1>

@@ -12,7 +12,7 @@ This document describes how to accomplish common tasks and lists every HTTP rout
 | Error body | `{ "message": "<string>" }` with 4xx/5xx. |
 | Authentication | JWT via cookie `Authorization=<token>` **or** header `Authorization: Bearer <token>`. |
 
-**Catalog / category sync responses** (`POST …/categories/sync`, `POST …/catalog/sync` for stores and suppliers): JSON includes `fetched`, `upserted`, and `removed` — `removed` is the count of DB rows deleted because they no longer exist in the remote Woo or Store API snapshot (or full wipe when the remote list is empty).
+**Catalog / category sync responses** (`POST .../categories/sync`, `POST .../catalog/sync` for stores and suppliers): JSON includes `fetched`, `upserted`, and `removed` — `removed` is the count of DB rows deleted because they no longer exist in the remote Woo or Store API snapshot (or full wipe when the remote list is empty).
 
 **Data model notes**
 
@@ -93,9 +93,35 @@ Use these before imports that rely on `supplier_catalog` or category data.
 | 1 | Sync Woo product categories into your DB for this store | `POST /stores/:id/categories/sync` |
 | 2 | List store categories | `GET /stores/:id/categories` |
 | 3 | Sync the store catalog snapshot | `POST /stores/:id/catalog/sync` |
-| 4 | **List products for the store (Woo product payload as exposed by the API)** | `GET /stores/:id/products` |
+| 4 | List products for the store (local `store_catalog` snapshot) | `GET /stores/:id/products` |
 
-> **Naming tip:** “Fetch store catalog” in the UI usually means either **listing synced Woo products** (`GET /stores/:id/products`) or **running a catalog sync** (`POST /stores/:id/catalog/sync`) depending on whether you need fresh data from Woo first.
+> **Naming tip:** "Fetch store catalog" in the UI usually means either **listing synced Woo products** (`GET /stores/:id/products`) or **running a catalog sync** (`POST /stores/:id/catalog/sync`) depending on whether you need fresh data from Woo first.
+
+### CRUD store categories (Woo live)
+
+These endpoints write directly to WooCommerce and keep `store_categories` in sync immediately — no separate sync call needed.
+
+| Step | What you want | Endpoint |
+|------|----------------|----------|
+| 1 | Create a new category in Woo | `POST /stores/:storeId/categories` — body: `name`, optional `slug`, `parent`, `description`, `display` |
+| 2 | Get a single category (live from Woo) | `GET /stores/:storeId/categories/:wooCategoryId` |
+| 3 | Update a category in Woo | `PUT /stores/:storeId/categories/:wooCategoryId` — all fields optional |
+| 4 | Delete a category from Woo | `DELETE /stores/:storeId/categories/:wooCategoryId` — also removes the local `store_categories` row |
+
+> **Note:** Deleting a category that has child categories may fail with a Woo 400 error. Delete children first, then the parent.
+
+### CRUD store products (Woo live)
+
+These endpoints write directly to WooCommerce and keep `store_catalog` in sync immediately.
+
+| Step | What you want | Endpoint |
+|------|----------------|----------|
+| 1 | Create a new product in Woo | `POST /stores/:storeId/woo-products` — body: `name`, optional fields (see DTO) |
+| 2 | Get a single product (live from Woo) | `GET /stores/:storeId/woo-products/:wooProductId` |
+| 3 | Update a product in Woo | `PUT /stores/:storeId/woo-products/:wooProductId` — all fields optional |
+| 4 | Delete a product from Woo | `DELETE /stores/:storeId/woo-products/:wooProductId` — also removes the local `store_catalog` row |
+
+> **Why `/woo-products` and not `/products`?** `GET /stores/:id/products` already exists and returns the local `store_catalog` snapshot. `/woo-products` is the live CRUD resource that talks directly to Woo.
 
 ### Import products into the store
 
@@ -114,7 +140,7 @@ Use these before imports that rely on `supplier_catalog` or category data.
 
 ### User directory (admin-style CRUD)
 
-> These routes are **not** protected by `authMiddleware` in the current codebase—lock them down in production.
+> These routes are **not** protected by `authMiddleware` in the current codebase — lock them down in production.
 
 | Step | What you want | Endpoint |
 |------|----------------|----------|
@@ -162,10 +188,10 @@ Use these before imports that rely on `supplier_catalog` or category data.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/stores` | yes | List stores for current user |
-| GET | `/stores/:id/categories` | yes | Store (Woo) categories |
+| GET | `/stores/:id/categories` | yes | Store (Woo) categories — local `store_categories` snapshot |
 | POST | `/stores/:id/categories/sync` | yes | Full sync Woo → `store_categories` (`fetched`, `upserted`, `removed`) |
 | POST | `/stores/:id/categories/clear` | yes | Delete all Woo categories for this store; body: `confirm` must be true. Run sync after to clean DB. |
-| GET | `/stores/:id/products` | yes | Store products (Woo-shaped) |
+| GET | `/stores/:id/products` | yes | Store products — local `store_catalog` snapshot |
 | POST | `/stores/:id/products/clear-woo` | yes | Body: `confirm` must be true |
 | POST | `/stores/:id/catalog/sync` | yes | Full sync Woo → `store_catalog` (`fetched`, `upserted`, `removed`) |
 | POST | `/stores/:id/import/sync-rules` | yes | Rules-based import from supplier catalog |
@@ -174,6 +200,24 @@ Use these before imports that rely on `supplier_catalog` or category data.
 | POST | `/stores` | yes | Create store |
 | PUT | `/stores/:id` | yes | Update store |
 | DELETE | `/stores/:id` | yes | Delete store |
+
+### Store categories CRUD (Woo live)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/stores/:storeId/categories` | yes | Create category in Woo + upsert in `store_categories` |
+| GET | `/stores/:storeId/categories/:wooCategoryId` | yes | Get single category live from Woo |
+| PUT | `/stores/:storeId/categories/:wooCategoryId` | yes | Update category in Woo + update `store_categories` |
+| DELETE | `/stores/:storeId/categories/:wooCategoryId` | yes | Delete from Woo (`force:true`) + delete from `store_categories` |
+
+### Store products CRUD (Woo live)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/stores/:storeId/woo-products` | yes | Create product in Woo + upsert in `store_catalog` |
+| GET | `/stores/:storeId/woo-products/:wooProductId` | yes | Get single product live from Woo |
+| PUT | `/stores/:storeId/woo-products/:wooProductId` | yes | Update product in Woo + update `store_catalog` |
+| DELETE | `/stores/:storeId/woo-products/:wooProductId` | yes | Delete from Woo (`force:true`) + delete from `store_catalog` |
 
 ### Suppliers
 
@@ -235,5 +279,9 @@ Use these before imports that rely on `supplier_catalog` or category data.
 | Category rule create | `storeId`, `supplierId`, `supplierCategoryId`, `storeCategoryId`, optional `enabled` |
 | Product category rule create | `storeId`, `supplierId`, `sourceProductId`, `storeCategoryId`, optional `enabled` |
 | Env to store | `storeId`, `consumerKey`, `consumerSecret` |
+| Store category create | `name`, optional `slug`, `parent` (int), `description`, `display` |
+| Store category update | all fields optional: `name`, `slug`, `parent`, `description`, `display` |
+| Store product create | `name`, optional `sku`, `type`, `status`, `description`, `short_description`, `regular_price`, `sale_price`, `manage_stock`, `stock_quantity`, `categories[]` |
+| Store product update | all fields optional — same as create |
 
 For exact validation (optional vs required, partial updates), see `src/dtos/`.

@@ -77,8 +77,14 @@ function parseWooProducts(data: unknown): ParsedProduct[] {
       ? (merged.categories as WooCategory[])
       : [];
 
-    let price: string | null = formatWooStorePriceFromFields(merged.prices, "sale_first");
-    let regularPrice: string | null = formatWooStorePriceFromFields(merged.prices, "regular_only");
+    let price: string | null = formatWooStorePriceFromFields(
+      merged.prices,
+      "sale_first",
+    );
+    let regularPrice: string | null = formatWooStorePriceFromFields(
+      merged.prices,
+      "regular_only",
+    );
     let salePrice: string | null = null;
     if (merged.prices && typeof merged.prices === "object") {
       const p = merged.prices as Record<string, unknown>;
@@ -193,11 +199,13 @@ function StockBadge({
 /* ------------------------------------------------------------------ */
 function ProductCard({
   product,
-  storeUrl,
+  locale,
+  storeId,
   messages,
 }: {
   product: ParsedProduct;
-  storeUrl: string;
+  locale: string;
+  storeId: string;
   messages: ReturnType<typeof getAppMessages>;
 }) {
   const imgSrc = product.image?.src ?? null;
@@ -275,10 +283,8 @@ function ProductCard({
         {/* Footer: stock + edit button */}
         <div className="mt-auto flex items-center justify-between gap-2">
           <StockBadge status={product.stockStatus} messages={messages} />
-          <a
-            href={`${storeUrl.replace(/\/$/, "")}/wp-admin/post.php?post=${product.id}&action=edit`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href={`/${locale}/stores/${storeId}/products/${product.id}/edit`}
             className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm transition hover:bg-muted-bg hover:border-primary/40 hover:text-primary"
           >
             <svg
@@ -289,10 +295,14 @@ function ProductCard({
               className="h-3.5 w-3.5 shrink-0"
               aria-hidden
             >
-              <path d="M11.5 2.5a2.121 2.121 0 0 1 3 3L5 15l-4 1 1-4L11.5 2.5z" strokeLinecap="round" strokeLinejoin="round" />
+              <path
+                d="M11.5 2.5a2.121 2.121 0 0 1 3 3L5 15l-4 1 1-4L11.5 2.5z"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
             {messages.editLabel}
-          </a>
+          </Link>
         </div>
       </div>
     </div>
@@ -313,7 +323,8 @@ function SubCategoryCard({
   messages: ReturnType<typeof getAppMessages>;
   displayCount?: number | null;
 }) {
-  const count = displayCount !== undefined ? displayCount : (category.count ?? null);
+  const count =
+    displayCount !== undefined ? displayCount : (category.count ?? null);
   const imgSrc =
     category.image?.src ??
     (Array.isArray(category.images) ? category.images[0]?.src : null) ??
@@ -332,7 +343,11 @@ function SubCategoryCard({
       <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-amber-50 to-orange-100">
         {imgSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={imgSrc} alt={imgAlt} className="h-full w-full object-cover" />
+          <img
+            src={imgSrc}
+            alt={imgAlt}
+            className="h-full w-full object-cover"
+          />
         ) : (
           <svg
             viewBox="0 0 24 24"
@@ -435,7 +450,9 @@ export default async function StoreCategoryProductsPage({ params }: Props) {
   function totalCount(catId: number): number {
     const children = childrenByParent.get(catId) ?? [];
     const self = allCategories.find((c) => c.id === catId)?.count ?? 0;
-    return self + children.reduce((sum, child) => sum + totalCount(child.id), 0);
+    return (
+      self + children.reduce((sum, child) => sum + totalCount(child.id), 0)
+    );
   }
 
   /* Collect this category + all its descendants */
@@ -481,7 +498,9 @@ export default async function StoreCategoryProductsPage({ params }: Props) {
         </Link>
         {ancestors.map((anc) => (
           <>
-            <span key={`sep-${anc.id}`} className="text-muted/60">/</span>
+            <span key={`sep-${anc.id}`} className="text-muted/60">
+              /
+            </span>
             <Link
               key={anc.id}
               href={`/${locale}/stores/${id}/categories/${anc.id}`}
@@ -492,9 +511,7 @@ export default async function StoreCategoryProductsPage({ params }: Props) {
           </>
         ))}
         <span className="text-muted/60">/</span>
-        <span className="truncate text-muted">
-          {category?.name ?? catId}
-        </span>
+        <span className="truncate text-muted">{category?.name ?? catId}</span>
       </div>
 
       {/* Header */}
@@ -593,7 +610,8 @@ export default async function StoreCategoryProductsPage({ params }: Props) {
               <ProductCard
                 key={product.id}
                 product={product}
-                storeUrl={store.url}
+                locale={locale}
+                storeId={id}
                 messages={messages}
               />
             ))}

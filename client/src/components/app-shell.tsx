@@ -28,7 +28,12 @@ function NavIcon({
 
 function IconStore() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+    >
       <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
       <polyline points="9 22 9 12 15 12 15 22" />
     </svg>
@@ -37,7 +42,12 @@ function IconStore() {
 
 function IconArrows() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+    >
       <path d="M7 16V4M7 4L3 8M7 4l4 4M17 8v12M17 20l4-4M17 20l-4-4" />
     </svg>
   );
@@ -45,7 +55,12 @@ function IconArrows() {
 
 function IconPackage() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+    >
       <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
       <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
       <line x1="12" y1="22.08" x2="12" y2="12" />
@@ -55,7 +70,12 @@ function IconPackage() {
 
 function IconSettings() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+    >
       <circle cx="12" cy="12" r="3" />
       <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
     </svg>
@@ -64,7 +84,13 @@ function IconSettings() {
 
 function IconSearch() {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+    <svg
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
       <circle cx="11" cy="11" r="8" />
       <path d="m21 21-4.35-4.35" />
     </svg>
@@ -73,7 +99,13 @@ function IconSearch() {
 
 function IconBell() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.75">
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+    >
       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
       <path d="M13.73 21a2 2 0 0 1-3.46 0" />
     </svg>
@@ -82,7 +114,13 @@ function IconBell() {
 
 function IconCloud() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.75">
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+    >
       <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
     </svg>
   );
@@ -100,10 +138,26 @@ export function AppShell({ locale, messages, children }: Props) {
 
   const prefix = `/${locale}`;
   const nav = [
-    { href: `${prefix}/stores`, label: messages.navStores, icon: <IconStore /> },
-    { href: `${prefix}/suppliers`, label: messages.navSuppliers, icon: <IconPackage /> },
-    { href: `${prefix}/mapping`, label: messages.navMapping, icon: <IconArrows /> },
-    { href: `${prefix}/settings`, label: messages.navSettings, icon: <IconSettings /> },
+    {
+      href: `${prefix}/stores`,
+      label: messages.navStores,
+      icon: <IconStore />,
+    },
+    {
+      href: `${prefix}/suppliers`,
+      label: messages.navSuppliers,
+      icon: <IconPackage />,
+    },
+    {
+      href: `${prefix}/mapping`,
+      label: messages.navMapping,
+      icon: <IconArrows />,
+    },
+    {
+      href: `${prefix}/settings`,
+      label: messages.navSettings,
+      icon: <IconSettings />,
+    },
   ];
 
   function isActive(href: string) {
@@ -120,7 +174,13 @@ export function AppShell({ locale, messages, children }: Props) {
       <div className="border-b border-shell-sidebar-border px-5 py-6">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground shadow-sm ring-1 ring-black/5">
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-6 w-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M8 12h8M12 8v8M4 12h2M18 12h2" strokeLinecap="round" />
             </svg>
           </div>
@@ -128,7 +188,9 @@ export function AppShell({ locale, messages, children }: Props) {
             <p className="truncate text-base font-bold tracking-tight text-shell-sidebar-foreground">
               {messages.brandName}
             </p>
-            <p className="text-xs text-shell-sidebar-muted">{messages.brandTagline}</p>
+            <p className="text-xs text-shell-sidebar-muted">
+              {messages.brandTagline}
+            </p>
           </div>
         </div>
       </div>
@@ -148,7 +210,9 @@ export function AppShell({ locale, messages, children }: Props) {
               }`}
             >
               <NavIcon active={active}>{icon}</NavIcon>
-              <span className="min-w-0 flex-1 text-start leading-snug">{label}</span>
+              <span className="min-w-0 flex-1 text-start leading-snug">
+                {label}
+              </span>
             </Link>
           );
         })}
@@ -210,17 +274,34 @@ export function AppShell({ locale, messages, children }: Props) {
               aria-label={messages.openMenu}
               onClick={() => setMobileOpen(true)}
             >
-              <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <svg
+                className="h-6 w-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
                 <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
               </svg>
             </button>
             <div className="hidden min-w-0 items-center gap-4 text-sm sm:flex">
-              <span className="font-bold text-foreground">{messages.brandName}</span>
-              <span className="hidden h-4 w-px bg-border md:block" aria-hidden />
-              <a href="#" className="text-shell-topbar-muted transition hover:text-primary">
+              <span className="font-bold text-foreground">
+                {messages.brandName}
+              </span>
+              <span
+                className="hidden h-4 w-px bg-border md:block"
+                aria-hidden
+              />
+              <a
+                href="#"
+                className="text-shell-topbar-muted transition hover:text-primary"
+              >
                 {messages.topBarDocs}
               </a>
-              <a href="#" className="text-shell-topbar-muted transition hover:text-primary">
+              <a
+                href="#"
+                className="text-shell-topbar-muted transition hover:text-primary"
+              >
                 {messages.topBarSupport}
               </a>
             </div>
