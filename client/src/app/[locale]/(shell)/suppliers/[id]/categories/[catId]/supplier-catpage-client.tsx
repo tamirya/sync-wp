@@ -55,6 +55,20 @@ type Messages = {
 } & SyncToStoreModalMessages;
 
 /* ------------------------------------------------------------------ */
+/*  Constants                                                           */
+/* ------------------------------------------------------------------ */
+const CARD_GRADIENTS = [
+  "from-violet-500 to-purple-600",
+  "from-blue-500 to-indigo-600",
+  "from-emerald-500 to-teal-600",
+  "from-orange-500 to-amber-500",
+  "from-red-500 to-orange-600",
+  "from-cyan-500 to-sky-600",
+  "from-lime-500 to-green-600",
+  "from-sky-400 to-cyan-500",
+];
+
+/* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
 /* ------------------------------------------------------------------ */
 function parsePrice(str: string | null | undefined): number {
@@ -102,7 +116,9 @@ function StockBadge({
         ? "bg-green-100 text-green-700 ring-green-200"
         : "bg-amber-100 text-amber-700 ring-amber-200";
   return (
-    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${cls}`}>
+    <span
+      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${cls}`}
+    >
       {label}
     </span>
   );
@@ -130,80 +146,106 @@ function SubCatCard({
     sub.image?.alt ??
     (Array.isArray(sub.images) ? sub.images[0]?.alt : null) ??
     sub.name;
+  const gradient = CARD_GRADIENTS[sub.id % CARD_GRADIENTS.length];
 
   return (
     <div
-      className={`group flex items-center gap-3 rounded-2xl border bg-card px-4 py-3 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 ${
+      className={`group flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${
         isSelected
           ? "border-primary/70 ring-2 ring-primary/20"
-          : "border-border/80 hover:border-primary/40"
+          : "border-border/60 hover:border-primary/30"
       }`}
     >
-      {/* Icon */}
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-sky-50 to-cyan-100">
+      {/* Gradient thumbnail — links to sub-category page */}
+      <Link
+        href={sub.href}
+        className={`relative block h-28 w-full shrink-0 overflow-hidden bg-gradient-to-br ${gradient}`}
+      >
+        <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/10" />
+        <div className="absolute -left-3 bottom-0 h-14 w-14 rounded-full bg-white/10" />
+
         {imgSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={imgSrc} alt={imgAlt} className="h-full w-full object-cover" />
+          <img
+            src={imgSrc}
+            alt={imgAlt}
+            className="h-full w-full object-cover opacity-90"
+          />
         ) : (
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.25"
-            className="h-5 w-5 text-cyan-400"
-            aria-hidden
-          >
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-          </svg>
+          <div className="flex h-full w-full items-center justify-center">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              strokeWidth="1.25"
+              className="h-10 w-10 opacity-90 drop-shadow-sm"
+              aria-hidden
+            >
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            </svg>
+          </div>
         )}
-      </div>
+      </Link>
 
-      {/* Text — links to sub-category page */}
-      <Link href={sub.href} className="flex-1 min-w-0">
-        <p className="truncate text-sm font-semibold text-card-foreground transition-colors hover:text-primary">
-          {sub.name}
-        </p>
-        {sub.displayCount !== null && (
-          <p className="text-[11px] text-muted">
-            {sub.displayCount} {messages.storeCategoryProducts}
+      {/* Body */}
+      <div className="flex flex-1 flex-col gap-2 p-4">
+        <Link href={sub.href}>
+          <p className="line-clamp-1 text-sm font-bold text-card-foreground transition-colors hover:text-primary">
+            {sub.name}
           </p>
-        )}
-      </Link>
+        </Link>
 
-      {/* Select toggle */}
-      <button
-        onClick={onToggle}
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border text-xs font-bold transition-all ${
-          isSelected
-            ? "border-primary bg-primary text-white"
-            : "border-border bg-card text-muted hover:border-primary/50 hover:text-primary"
-        }`}
-        aria-label={isSelected ? messages.selectedLabel : messages.selectLabel}
-        title={isSelected ? messages.selectedLabel : messages.selectLabel}
-      >
-        {isSelected ? (
-          <svg viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5" aria-hidden>
-            <path d="M13.5 4 6 11.5l-3.5-3.5 1-1L6 9.5l6.5-6.5 1 1Z" />
-          </svg>
-        ) : (
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-3.5 w-3.5" aria-hidden>
-            <rect x="2" y="2" width="12" height="12" rx="2" />
-          </svg>
-        )}
-      </button>
+        <div className="flex items-center justify-between">
+          {sub.displayCount !== null ? (
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-bold text-primary leading-none">
+                {sub.displayCount.toLocaleString()}
+              </span>
+              <span className="text-[11px] text-muted">
+                {messages.storeCategoryProducts}
+              </span>
+            </div>
+          ) : (
+            <span />
+          )}
+          <Link
+            href={sub.href}
+            tabIndex={-1}
+            aria-hidden
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary transition-all group-hover:bg-primary group-hover:text-white"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              className="h-3.5 w-3.5 shrink-0 rtl:rotate-180"
+              aria-hidden
+            >
+              <path
+                d="M9 18l6-6-6-6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </Link>
+        </div>
 
-      {/* Navigation chevron */}
-      <Link href={sub.href} tabIndex={-1} aria-hidden>
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          className="h-4 w-4 shrink-0 text-muted/40 transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
+        {/* Select button */}
+        <button
+          onClick={onToggle}
+          className={`mt-auto w-full rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+            isSelected
+              ? "bg-primary text-white shadow-sm hover:bg-primary/90"
+              : "border border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+          }`}
+          aria-label={
+            isSelected ? messages.selectedLabel : messages.selectLabel
+          }
         >
-          <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </Link>
+          {isSelected ? messages.selectedLabel : messages.selectLabel}
+        </button>
+      </div>
     </div>
   );
 }
@@ -376,7 +418,9 @@ export function SupplierCatPageClient({
   supplierId: number;
 }) {
   const [selectedCatIds, setSelectedCatIds] = useState<Set<number>>(new Set());
-  const [selectedProdIds, setSelectedProdIds] = useState<Set<number>>(new Set());
+  const [selectedProdIds, setSelectedProdIds] = useState<Set<number>>(
+    new Set(),
+  );
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -390,7 +434,9 @@ export function SupplierCatPageClient({
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting)
-          setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, products.length));
+          setVisibleCount((prev) =>
+            Math.min(prev + PAGE_SIZE, products.length),
+          );
       },
       { rootMargin: "200px" },
     );
@@ -529,7 +575,12 @@ export function SupplierCatPageClient({
                   key={`cat-${c.id}`}
                   className="flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary"
                 >
-                  <svg viewBox="0 0 16 16" fill="currentColor" className="h-3 w-3 shrink-0" aria-hidden>
+                  <svg
+                    viewBox="0 0 16 16"
+                    fill="currentColor"
+                    className="h-3 w-3 shrink-0"
+                    aria-hidden
+                  >
                     <path d="M3 3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1H8.5L7 3H3z" />
                   </svg>
                   <span className="max-w-[130px] truncate">{c.name}</span>
@@ -554,7 +605,14 @@ export function SupplierCatPageClient({
                   key={`prod-${p.id}`}
                   className="flex items-center gap-2 rounded-full border border-cyan-300/50 bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-700"
                 >
-                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-3 w-3 shrink-0" aria-hidden>
+                  <svg
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    className="h-3 w-3 shrink-0"
+                    aria-hidden
+                  >
                     <rect x="2" y="2" width="12" height="12" rx="1.5" />
                     <circle cx="5.5" cy="5.5" r="1" />
                     <path d="M14 10 10 6 2 14" />
@@ -587,8 +645,16 @@ export function SupplierCatPageClient({
                 onClick={() => setSyncModalOpen(true)}
                 className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:brightness-110"
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0" aria-hidden>
-                  <path d="M1 4v6h6" /><path d="M23 20v-6h-6" />
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="h-3.5 w-3.5 shrink-0"
+                  aria-hidden
+                >
+                  <path d="M1 4v6h6" />
+                  <path d="M23 20v-6h-6" />
                   <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
                 </svg>
                 {messages.syncToStoreButton}

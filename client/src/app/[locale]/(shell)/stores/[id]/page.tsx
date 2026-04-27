@@ -86,6 +86,17 @@ async function fetchProductCategoryIds(
 /* ------------------------------------------------------------------ */
 /*  Category card                                                        */
 /* ------------------------------------------------------------------ */
+const CARD_GRADIENTS = [
+  "from-violet-500 to-purple-600",
+  "from-blue-500 to-indigo-600",
+  "from-emerald-500 to-teal-600",
+  "from-orange-500 to-amber-500",
+  "from-red-500 to-orange-600",
+  "from-cyan-500 to-sky-600",
+  "from-lime-500 to-green-600",
+  "from-sky-400 to-cyan-500",
+];
+
 function CategoryCard({
   category,
   parentName,
@@ -100,7 +111,8 @@ function CategoryCard({
   displayCount?: number | null;
 }) {
   const isRoot = category.parent === 0;
-  const count = displayCount !== undefined ? displayCount : (category.count ?? null);
+  const count =
+    displayCount !== undefined ? displayCount : (category.count ?? null);
   const imgSrc =
     category.image?.src ??
     (Array.isArray(category.images) ? category.images[0]?.src : null) ??
@@ -109,61 +121,86 @@ function CategoryCard({
     category.image?.alt ??
     (Array.isArray(category.images) ? category.images[0]?.alt : null) ??
     category.name;
+  const gradient = CARD_GRADIENTS[category.id % CARD_GRADIENTS.length];
 
   return (
-    <Link href={href} className="group flex flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-all hover:shadow-md hover:border-primary/40 hover:-translate-y-0.5">
-      {/* Image or placeholder */}
-      <div className="relative h-36 w-full shrink-0 overflow-hidden bg-gradient-to-br from-amber-50 to-orange-50">
+    <Link
+      href={href}
+      className="group flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:border-primary/30"
+    >
+      {/* Thumbnail */}
+      <div
+        className={`relative h-32 w-full shrink-0 overflow-hidden bg-gradient-to-br ${gradient}`}
+      >
         {imgSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={imgSrc}
             alt={imgAlt}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover opacity-90"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center">
+          <>
+            {/* Decorative circles */}
+            <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/10" />
+            <div className="absolute -left-3 bottom-0 h-14 w-14 rounded-full bg-white/10" />
+            <div className="flex h-full w-full items-center justify-center">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="1.25"
+                className="h-12 w-12 opacity-90 drop-shadow-sm"
+                aria-hidden
+              >
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+              </svg>
+            </div>
+          </>
+        )}
+        {/* Root / sub badge on image */}
+        <span className="absolute left-2.5 top-2.5 rounded-full bg-black/25 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+          {isRoot
+            ? messages.storeCategoryRoot
+            : (parentName ?? messages.storeCategoryParent)}
+        </span>
+      </div>
+
+      {/* Body */}
+      <div className="flex flex-1 flex-col gap-2 p-4">
+        <h3 className="line-clamp-1 text-sm font-bold text-card-foreground group-hover:text-primary transition-colors">
+          {category.name}
+        </h3>
+
+        <div className="mt-auto flex items-center justify-between pt-1">
+          {count !== null ? (
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-bold text-primary leading-none">
+                {count.toLocaleString()}
+              </span>
+              <span className="text-[11px] text-muted">
+                {messages.storeCategoryProducts}
+              </span>
+            </div>
+          ) : (
+            <span />
+          )}
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary transition-all group-hover:bg-primary group-hover:text-white">
             <svg
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.25"
-              className="h-12 w-12 text-amber-300"
+              strokeWidth="2.5"
+              className="h-3.5 w-3.5 shrink-0 rtl:rotate-180"
               aria-hidden
             >
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+              <path
+                d="M9 18l6-6-6-6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </div>
-        )}
-      </div>
-
-      {/* Body */}
-      <div className="flex flex-col gap-3 p-4">
-        <div>
-          <h3 className="truncate text-sm font-bold text-card-foreground">
-            {category.name}
-          </h3>
-        </div>
-
-        {/* Badges */}
-        <div className="flex flex-wrap items-center gap-2">
-          {count !== null && (
-            <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
-              {count} {messages.storeCategoryProducts}
-            </span>
-          )}
-          {isRoot ? (
-            <span className="rounded-full bg-muted-bg px-2.5 py-0.5 text-[11px] font-medium text-muted ring-1 ring-border/60">
-              {messages.storeCategoryRoot}
-            </span>
-          ) : (
-            <span className="flex items-center gap-1 rounded-full bg-muted-bg px-2.5 py-0.5 text-[11px] font-medium text-muted ring-1 ring-border/60">
-              <svg viewBox="0 0 16 16" fill="currentColor" className="h-3 w-3 shrink-0" aria-hidden>
-                <path d="M3 3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1H8.5L7 3H3z" />
-              </svg>
-              {parentName ?? messages.storeCategoryParent}
-            </span>
-          )}
         </div>
       </div>
     </Link>
@@ -225,7 +262,9 @@ export default async function StoreCategoriesPage({ params }: Props) {
     const self = productCatResult.ok
       ? (directCountByCatId.get(catId) ?? 0)
       : (categories.find((c) => c.id === catId)?.count ?? 0);
-    return self + children.reduce((sum, child) => sum + totalCount(child.id), 0);
+    return (
+      self + children.reduce((sum, child) => sum + totalCount(child.id), 0)
+    );
   }
 
   /* show only root categories on the first level */
@@ -246,7 +285,11 @@ export default async function StoreCategoriesPage({ params }: Props) {
           className={`h-4 w-4 shrink-0 ${locale === "he" ? "rotate-180" : ""}`}
           aria-hidden
         >
-          <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M19 12H5M12 19l-7-7 7-7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
         {messages.storeCategoriesBack}
       </Link>

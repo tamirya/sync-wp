@@ -205,26 +205,32 @@ export function LoginScreen({ locale, messages, redirectAfterLogin }: Props) {
       <DecorativeLines />
 
       <div className="relative z-[1] flex min-h-dvh flex-col items-center px-4 py-10 sm:py-16">
-        <header className="flex w-full max-w-md flex-col items-center gap-3 text-center">
+        <header className="flex w-full max-w-md flex-col items-center gap-3 text-center mb-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/login-logo.svg"
             alt={messages.brand}
-            className="h-[300px] w-auto"
+            className="w-auto"
             draggable={false}
           />
-          <p className="max-w-sm text-sm text-muted">{messages.tagline}</p>
-          <div className="mt-1">
-            <LocaleSwitcher locale={locale} />
-          </div>
+          {/* <p className="max-w-sm text-sm text-muted">{messages.tagline}</p> */}
         </header>
 
         <div className="w-full max-w-[min(100%,28rem)] rounded-3xl border border-border/60 bg-card p-6 shadow-[0_4px_24px_rgba(15,23,42,0.06)] sm:p-8">
-          <div className="text-start">
-            <h1 className="text-xl font-bold text-card-foreground sm:text-2xl">
-              {messages.title}
-            </h1>
-            <p className="mt-1 text-sm text-muted">{messages.subtitle}</p>
+          <div className="flex justify-between gap-4">
+            <div className="text-start">
+              <h1 className="text-xl font-bold text-card-foreground sm:text-2xl">
+                {messages.title}
+              </h1>
+              <p className="mt-1 mb-1 text-sm text-muted">
+                {messages.subtitle}
+              </p>
+            </div>
+            <div>
+              <div className="mt-1">
+                <LocaleSwitcher locale={locale} />
+              </div>
+            </div>
           </div>
 
           <form onSubmit={onSubmit} className="flex flex-col gap-5">

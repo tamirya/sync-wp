@@ -312,6 +312,17 @@ function ProductCard({
 /* ------------------------------------------------------------------ */
 /*  Sub-category card                                                   */
 /* ------------------------------------------------------------------ */
+const CARD_GRADIENTS = [
+  "from-violet-500 to-purple-600",
+  "from-blue-500 to-indigo-600",
+  "from-emerald-500 to-teal-600",
+  "from-orange-500 to-amber-500",
+  "from-red-500 to-orange-600",
+  "from-cyan-500 to-sky-600",
+  "from-lime-500 to-green-600",
+  "from-sky-400 to-cyan-500",
+];
+
 function SubCategoryCard({
   category,
   href,
@@ -333,58 +344,78 @@ function SubCategoryCard({
     category.image?.alt ??
     (Array.isArray(category.images) ? category.images[0]?.alt : null) ??
     category.name;
+  const gradient = CARD_GRADIENTS[category.id % CARD_GRADIENTS.length];
 
   return (
     <Link
       href={href}
-      className="group flex items-center gap-3 rounded-2xl border border-border/80 bg-card px-4 py-3 shadow-sm transition-all hover:border-primary/40 hover:shadow-md hover:-translate-y-0.5"
+      className="group flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:border-primary/30"
     >
-      {/* Icon */}
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-amber-50 to-orange-100">
+      {/* Gradient thumbnail */}
+      <div
+        className={`relative h-28 w-full shrink-0 overflow-hidden bg-gradient-to-br ${gradient}`}
+      >
+        <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/10" />
+        <div className="absolute -left-3 bottom-0 h-14 w-14 rounded-full bg-white/10" />
         {imgSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={imgSrc}
             alt={imgAlt}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover opacity-90"
           />
         ) : (
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.25"
-            className="h-5 w-5 text-amber-400"
-            aria-hidden
-          >
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-          </svg>
+          <div className="flex h-full w-full items-center justify-center">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              strokeWidth="1.25"
+              className="h-10 w-10 opacity-90 drop-shadow-sm"
+              aria-hidden
+            >
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            </svg>
+          </div>
         )}
       </div>
 
-      {/* Text */}
-      <div className="flex-1 min-w-0">
-        <p className="truncate text-sm font-semibold text-card-foreground group-hover:text-primary transition-colors">
+      {/* Body */}
+      <div className="flex flex-1 flex-col gap-2 p-4">
+        <p className="line-clamp-1 text-sm font-bold text-card-foreground group-hover:text-primary transition-colors">
           {category.name}
         </p>
-        {count !== null && (
-          <p className="text-[11px] text-muted">
-            {count} {messages.storeCategoryProducts}
-          </p>
-        )}
+        <div className="flex items-center justify-between">
+          {count !== null ? (
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-bold text-primary leading-none">
+                {count.toLocaleString()}
+              </span>
+              <span className="text-[11px] text-muted">
+                {messages.storeCategoryProducts}
+              </span>
+            </div>
+          ) : (
+            <span />
+          )}
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary transition-all group-hover:bg-primary group-hover:text-white">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              className="h-3.5 w-3.5 shrink-0 rtl:rotate-180"
+              aria-hidden
+            >
+              <path
+                d="M9 18l6-6-6-6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+        </div>
       </div>
-
-      {/* Chevron */}
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        className="h-4 w-4 shrink-0 text-muted/40 transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
-        aria-hidden
-      >
-        <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
     </Link>
   );
 }
@@ -557,7 +588,7 @@ export default async function StoreCategoryProductsPage({ params }: Props) {
           <h2 className="mb-4 text-sm font-bold uppercase tracking-widest text-muted">
             {messages.storeCategorySubcategoriesTitle}
           </h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {subCategories.map((sub) => (
               <SubCategoryCard
                 key={sub.id}
