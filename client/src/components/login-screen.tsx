@@ -319,6 +319,18 @@ export function LoginScreen({ locale, messages, redirectAfterLogin }: Props) {
               </p>
             ) : null}
 
+            <p className="text-center text-sm text-muted">
+              {messages.termsPrefix}{" "}
+              <a
+                href="/agriments.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-accent hover:underline underline-offset-4"
+              >
+                {messages.termsLink}
+              </a>
+            </p>
+
             <button
               type="submit"
               disabled={pending}

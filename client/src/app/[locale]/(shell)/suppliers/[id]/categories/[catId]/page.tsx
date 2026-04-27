@@ -73,8 +73,14 @@ function parseWooProducts(data: unknown): ParsedProduct[] {
       ? (merged.categories as WooCategory[])
       : [];
 
-    let price: string | null = formatWooStorePriceFromFields(merged.prices, "sale_first");
-    let regularPrice: string | null = formatWooStorePriceFromFields(merged.prices, "regular_only");
+    let price: string | null = formatWooStorePriceFromFields(
+      merged.prices,
+      "sale_first",
+    );
+    let regularPrice: string | null = formatWooStorePriceFromFields(
+      merged.prices,
+      "regular_only",
+    );
     let salePrice: string | null = null;
     if (merged.prices && typeof merged.prices === "object") {
       const p = merged.prices as Record<string, unknown>;
@@ -90,8 +96,7 @@ function parseWooProducts(data: unknown): ParsedProduct[] {
     if (!salePrice) salePrice = str(merged.sale_price);
 
     const stockAvailabilityText =
-      merged.stock_availability &&
-      typeof merged.stock_availability === "object"
+      merged.stock_availability && typeof merged.stock_availability === "object"
         ? str((merged.stock_availability as Record<string, unknown>).text)
         : null;
 
@@ -159,7 +164,6 @@ async function fetchProducts(
   }
 }
 
-
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
@@ -221,7 +225,9 @@ export default async function SupplierCategoryProductsPage({ params }: Props) {
   function totalCount(cId: number): number {
     const children = childrenByParent.get(cId) ?? [];
     const self = allCategories.find((c) => c.id === cId)?.count ?? 0;
-    return self + children.reduce((sum, child) => sum + totalCount(child.id), 0);
+    return (
+      self + children.reduce((sum, child) => sum + totalCount(child.id), 0)
+    );
   }
 
   /* Products belonging to this category */
@@ -250,7 +256,9 @@ export default async function SupplierCategoryProductsPage({ params }: Props) {
         </Link>
         {ancestors.map((anc) => (
           <>
-            <span key={`sep-${anc.id}`} className="text-muted/60">/</span>
+            <span key={`sep-${anc.id}`} className="text-muted/60">
+              /
+            </span>
             <Link
               key={anc.id}
               href={`/${locale}/suppliers/${id}/categories/${anc.id}`}
@@ -261,9 +269,7 @@ export default async function SupplierCategoryProductsPage({ params }: Props) {
           </>
         ))}
         <span className="text-muted/60">/</span>
-        <span className="truncate text-muted">
-          {category?.name ?? catId}
-        </span>
+        <span className="truncate text-muted">{category?.name ?? catId}</span>
       </div>
 
       {/* Header */}
@@ -304,6 +310,7 @@ export default async function SupplierCategoryProductsPage({ params }: Props) {
       </div>
 
       <SupplierCatPageClient
+        currentCategoryName={category?.name}
         subCategories={subCategories.map(
           (sub): ClientSubCategory => ({
             id: sub.id,
@@ -322,19 +329,27 @@ export default async function SupplierCategoryProductsPage({ params }: Props) {
         supplierId={Number(id)}
         messages={{
           storeCategoryProducts: messages.storeCategoryProducts,
-          storeCategorySubcategoriesTitle: messages.storeCategorySubcategoriesTitle,
+          storeCategorySubcategoriesTitle:
+            messages.storeCategorySubcategoriesTitle,
           storeCategoryProductsTitle: messages.storeCategoryProductsTitle,
           storeCategoryProductsEmpty: messages.storeCategoryProductsEmpty,
-          storeCategoryProductsLoadError: messages.storeCategoryProductsLoadError,
+          storeCategoryProductsLoadError:
+            messages.storeCategoryProductsLoadError,
           storeProductInStock: messages.storeProductInStock,
           storeProductOutOfStock: messages.storeProductOutOfStock,
           storeProductOnBackorder: messages.storeProductOnBackorder,
           storeProductSalePrice: messages.storeProductSalePrice,
-          supplierCategoryProductsViewLabel: messages.supplierCategoryProductsViewLabel,
+          supplierCategoryProductsViewLabel:
+            messages.supplierCategoryProductsViewLabel,
           selectLabel: messages.selectLabel,
           selectedLabel: messages.selectedLabel,
           selectionTotal: messages.selectionTotal,
           selectionClear: messages.selectionClear,
+          selectionPanelTitle: messages.selectionPanelTitle,
+          selectionPanelCategoriesSection:
+            messages.selectionPanelCategoriesSection,
+          selectionPanelProductsSection: messages.selectionPanelProductsSection,
+          selectionPanelEmpty: messages.selectionPanelEmpty,
           syncToStoreButton: messages.syncToStoreButton,
           syncModalTitle: messages.syncModalTitle,
           syncModalSelectStore: messages.syncModalSelectStore,

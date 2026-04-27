@@ -3,12 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, useEffect, useRef } from "react";
-import { deleteSupplierAction } from "@/app/actions/delete-entities";
 import {
   syncSupplierProductsAction,
   syncSupplierCategoriesAction,
 } from "@/app/actions/sync-supplier";
-import { ConfirmModal } from "@/components/confirm-modal";
 import type { Locale } from "@/i18n/config";
 import type { SupplierCardData } from "@/lib/suppliers-api";
 import type { AppMessages } from "@/messages/app";
@@ -122,11 +120,8 @@ function SupplierCardItem({
   messages: AppMessages;
 }) {
   const router = useRouter();
-  const [deletePending, startDeleteTransition] = useTransition();
-  const [syncProductsPending, startSyncProductsTransition] = useTransition();
-  const [syncCategoriesPending, startSyncCategoriesTransition] = useTransition();
+  const [syncPending, startSyncTransition] = useTransition();
 
-  const [deleteOpen, setDeleteOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const menuRef = useRef<HTMLDivElement>(null);
@@ -143,39 +138,22 @@ function SupplierCardItem({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menuOpen]);
 
-  const anyPending =
-    deletePending || syncProductsPending || syncCategoriesPending;
+  const anyPending = syncPending;
 
-  function executeDelete() {
-    setDeleteOpen(false);
-    startDeleteTransition(async () => {
-      const r = await deleteSupplierAction(locale, supplier.id);
-      if (!r.ok) {
-        window.alert(`${messages.deleteFailedAlert} ${r.message}`);
+  function executeSync() {
+    setMenuOpen(false);
+    startSyncTransition(async () => {
+      const rProducts = await syncSupplierProductsAction(locale, supplier.id);
+      if (!rProducts.ok) {
+        window.alert(`${messages.syncFailedAlert} ${rProducts.message}`);
         return;
       }
-      router.refresh();
-    });
-  }
-
-  function executeSyncProducts() {
-    setMenuOpen(false);
-    startSyncProductsTransition(async () => {
-      const r = await syncSupplierProductsAction(locale, supplier.id);
-      if (!r.ok) {
-        window.alert(`${messages.syncFailedAlert} ${r.message}`);
-        return;
-      }
-      router.refresh();
-    });
-  }
-
-  function executeSyncCategories() {
-    setMenuOpen(false);
-    startSyncCategoriesTransition(async () => {
-      const r = await syncSupplierCategoriesAction(locale, supplier.id);
-      if (!r.ok) {
-        window.alert(`${messages.syncFailedAlert} ${r.message}`);
+      const rCategories = await syncSupplierCategoriesAction(
+        locale,
+        supplier.id,
+      );
+      if (!rCategories.ok) {
+        window.alert(`${messages.syncFailedAlert} ${rCategories.message}`);
         return;
       }
       router.refresh();
@@ -184,20 +162,30 @@ function SupplierCardItem({
 
   /* icons */
   const EditIcon = (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      className="h-4 w-4"
+      aria-hidden
+    >
       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
       <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
     </svg>
   );
   const SyncIcon = (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden>
-      <path d="M1 4v6h6" /><path d="M23 20v-6h-6" />
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      className="h-4 w-4"
+      aria-hidden
+    >
+      <path d="M1 4v6h6" />
+      <path d="M23 20v-6h-6" />
       <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
-    </svg>
-  );
-  const TrashIcon = (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden>
-      <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14zM10 11v6M14 11v6" />
     </svg>
   );
 
@@ -205,7 +193,6 @@ function SupplierCardItem({
     <>
       <article className="group flex flex-col rounded-[var(--radius-card)] border border-border/80 bg-card p-0 shadow-[var(--shadow-card)] transition-all duration-200 hover:shadow-[var(--shadow-card-hover)] hover:border-primary/40 hover:-translate-y-0.5">
         <div className="flex flex-col gap-4 p-6 pb-5">
-
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
             <Link
@@ -247,7 +234,12 @@ function SupplierCardItem({
                   {anyPending ? (
                     <Spinner className="h-4 w-4" />
                   ) : (
-                    <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden>
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      className="h-4 w-4"
+                      aria-hidden
+                    >
                       <circle cx="12" cy="5" r="1.5" />
                       <circle cx="12" cy="12" r="1.5" />
                       <circle cx="12" cy="19" r="1.5" />
@@ -271,25 +263,9 @@ function SupplierCardItem({
 
                     <MenuItem
                       icon={SyncIcon}
-                      label={messages.syncSupplierProducts}
-                      onClick={executeSyncProducts}
-                      pending={syncProductsPending}
-                    />
-                    <MenuItem
-                      icon={SyncIcon}
-                      label={messages.syncSupplierCategories}
-                      onClick={executeSyncCategories}
-                      pending={syncCategoriesPending}
-                    />
-
-                    <div className="my-1 border-t border-border/60" />
-
-                    <MenuItem
-                      icon={TrashIcon}
-                      label={messages.deleteSupplierAria}
-                      onClick={() => { setMenuOpen(false); setDeleteOpen(true); }}
-                      pending={deletePending}
-                      destructive
+                      label={messages.syncSupplier}
+                      onClick={executeSync}
+                      pending={syncPending}
                     />
                   </div>
                 )}
@@ -326,17 +302,6 @@ function SupplierCardItem({
           </p>
         </div>
       </article>
-
-      <ConfirmModal
-        open={deleteOpen}
-        dir={locale === "he" ? "rtl" : "ltr"}
-        title={messages.deleteConfirmTitle}
-        message={messages.confirmDeleteSupplier}
-        labelConfirm={messages.confirmYes}
-        labelCancel={messages.confirmNo}
-        onConfirm={executeDelete}
-        onCancel={() => setDeleteOpen(false)}
-      />
     </>
   );
 }

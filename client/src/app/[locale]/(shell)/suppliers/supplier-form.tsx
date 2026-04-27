@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { useFormStatus } from "react-dom";
 import type { Locale } from "@/i18n/config";
 import {
@@ -9,6 +16,8 @@ import {
   type SupplierFormField,
   type SupplierFormState,
 } from "@/app/actions/suppliers";
+import { deleteSupplierAction } from "@/app/actions/delete-entities";
+import { ConfirmModal } from "@/components/confirm-modal";
 import type { SuppliersFormMessages } from "@/messages/suppliers-form";
 
 function SubmitButton({ label }: { label: string }) {
@@ -40,9 +49,29 @@ export function SupplierForm({
   initial,
 }: Props) {
   const dir = locale === "he" ? "rtl" : "ltr";
+  const router = useRouter();
 
   const [name, setName] = useState(initial?.name ?? "");
   const [url, setUrl] = useState(initial?.url ?? "");
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletePending, startDeleteTransition] = useTransition();
+
+  const [termsOpen, setTermsOpen] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const termsConfirmedRef = useRef(false);
+
+  function executeDelete() {
+    setDeleteOpen(false);
+    startDeleteTransition(async () => {
+      const r = await deleteSupplierAction(locale, supplierId!);
+      if (!r.ok) {
+        window.alert(`${messages.deleteFailedAlert} ${r.message}`);
+        return;
+      }
+      router.push(`/${locale}/suppliers`);
+    });
+  }
 
   const editKey = mode === "edit" ? (supplierId ?? "") : "create";
   useEffect(() => {
@@ -74,6 +103,22 @@ export function SupplierForm({
       return undefined;
     }
     return serverFieldErrors?.[f];
+  }
+
+  function handleFormSubmit(e: React.FormEvent) {
+    if (mode !== "create") return;
+    if (termsConfirmedRef.current) {
+      termsConfirmedRef.current = false;
+      return;
+    }
+    e.preventDefault();
+    setTermsOpen(true);
+  }
+
+  function handleTermsConfirm() {
+    setTermsOpen(false);
+    termsConfirmedRef.current = true;
+    formRef.current?.requestSubmit();
   }
 
   const title = mode === "create" ? messages.addTitle : messages.editTitle;
@@ -142,7 +187,11 @@ export function SupplierForm({
           strokeWidth="2"
           aria-hidden
         >
-          <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M19 12H5M12 19l-7-7 7-7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
         {messages.back}
       </Link>
@@ -153,7 +202,9 @@ export function SupplierForm({
       <p className="mt-2 text-center text-sm text-muted">{subtitle}</p>
 
       <form
+        ref={formRef}
         action={formAction}
+        onSubmit={handleFormSubmit}
         autoComplete="off"
         className="mt-10 flex flex-col gap-4"
       >
@@ -188,6 +239,66 @@ export function SupplierForm({
           <SubmitButton label={submitLabel} />
         </div>
       </form>
+
+      {mode === "edit" && (
+        <div className="mt-10 border-t border-border/60 pt-8">
+          <button
+            type="button"
+            disabled={deletePending}
+            onClick={() => setDeleteOpen(true)}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-destructive/40 bg-destructive/5 px-6 py-3.5 text-base font-bold text-destructive transition hover:bg-destructive/10 disabled:opacity-60"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="h-5 w-5 shrink-0"
+              aria-hidden
+            >
+              <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14zM10 11v6M14 11v6" />
+            </svg>
+            {deletePending ? "…" : messages.deleteSupplier}
+          </button>
+        </div>
+      )}
+
+      <ConfirmModal
+        open={deleteOpen}
+        dir={dir}
+        title={messages.deleteConfirmTitle}
+        message={messages.deleteConfirmMessage}
+        labelConfirm={messages.deleteConfirmYes}
+        labelCancel={messages.deleteConfirmNo}
+        onConfirm={executeDelete}
+        onCancel={() => setDeleteOpen(false)}
+      />
+
+      <ConfirmModal
+        open={termsOpen}
+        dir={dir}
+        danger={false}
+        title={messages.termsConfirmTitle}
+        message=""
+        messageNode={
+          <>
+            {messages.termsConfirmPrefix}{" "}
+            <a
+              href="/agriments.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-accent underline underline-offset-4 hover:opacity-80"
+            >
+              {messages.termsConfirmLink}
+            </a>
+            {messages.termsConfirmSuffix}
+          </>
+        }
+        labelConfirm={messages.termsConfirmProceed}
+        labelCancel={messages.termsConfirmCancel}
+        onConfirm={handleTermsConfirm}
+        onCancel={() => setTermsOpen(false)}
+      />
     </div>
   );
 }

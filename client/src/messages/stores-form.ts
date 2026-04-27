@@ -26,6 +26,17 @@ export type StoresFormMessages = {
   errorMissingStoreContext: string;
   errorStoreCreatedKeysFailed: string;
   errorFromServer: string;
+  tooltipName: string;
+  tooltipUrl: string;
+  tooltipPort: string;
+  tooltipApiKey: string;
+  tooltipApiSecret: string;
+  removeStore: string;
+  removeConfirmTitle: string;
+  removeConfirmMessage: string;
+  removeConfirmYes: string;
+  removeConfirmNo: string;
+  removeFailedAlert: string;
 };
 
 const he: StoresFormMessages = {
@@ -54,6 +65,22 @@ const he: StoresFormMessages = {
   errorMissingStoreContext: "שגיאה: חנות לא נמצאה.",
   errorStoreCreatedKeysFailed: "החנות נוצרה, אך שמירת מפתחות ה-API נכשלה:",
   errorFromServer: "שגיאה מהשרת:",
+  tooltipName: "שם פנימי לזיהוי החנות במערכת — ניתן לבחור כל שם.",
+  tooltipUrl:
+    "כתובת ה-URL הראשית של חנות ה-WooCommerce שלך, למשל: https://mystore.com",
+  tooltipPort:
+    "מספר הפורט של שרת החנות. ברוב המקרים השאר ריק. נדרש רק אם החנות מוגדרת עם פורט מיוחד (למשל 8080).",
+  tooltipApiKey:
+    'מפתח REST API של WooCommerce. יצירה: WooCommerce ← הגדרות ← מתקדם ← REST API ← הוסף מפתח. בחר הרשאות "קריאה/כתיבה".',
+  tooltipApiSecret:
+    "הסיסמה הסודית של ה-API — נוצרת יחד עם מפתח הצרכן. מוצגת פעם אחת בלבד — שמור אותה במקום בטוח.",
+  removeStore: "הסרת חנות",
+  removeConfirmTitle: "הסרת חנות",
+  removeConfirmMessage:
+    "פעולה זו תסיר את החנות מהמערכת. לא יימחק תוכן כלשהו מהחנות עצמה. האם להמשיך?",
+  removeConfirmYes: "הסר",
+  removeConfirmNo: "ביטול",
+  removeFailedAlert: "ההסרה נכשלה:",
 };
 
 const en: StoresFormMessages = {
@@ -80,8 +107,26 @@ const en: StoresFormMessages = {
   errorInvalidServerResponse: "Invalid response from server.",
   errorMissingStoreId: "Missing store id.",
   errorMissingStoreContext: "Error: store not found.",
-  errorStoreCreatedKeysFailed: "The store was created, but saving API keys failed:",
+  errorStoreCreatedKeysFailed:
+    "The store was created, but saving API keys failed:",
   errorFromServer: "Server error:",
+  tooltipName:
+    "Internal name to identify the store in the system — you can choose any name.",
+  tooltipUrl:
+    "The base URL of your WooCommerce store, e.g. https://mystore.com",
+  tooltipPort:
+    "Server port number. Leave blank in most cases. Only required if your store runs on a custom port (e.g. 8080).",
+  tooltipApiKey:
+    'WooCommerce REST API Consumer Key. Create it via: WooCommerce → Settings → Advanced → REST API → Add key. Select "Read/Write" permissions.',
+  tooltipApiSecret:
+    "The API Consumer Secret — generated together with the Consumer Key. Shown only once — keep it in a safe place.",
+  removeStore: "Remove store",
+  removeConfirmTitle: "Remove store",
+  removeConfirmMessage:
+    "This will remove the store from the system. No content will be deleted from the store itself. Continue?",
+  removeConfirmYes: "Remove",
+  removeConfirmNo: "Cancel",
+  removeFailedAlert: "Removal failed:",
 };
 
 export function getStoresFormMessages(locale: Locale): StoresFormMessages {

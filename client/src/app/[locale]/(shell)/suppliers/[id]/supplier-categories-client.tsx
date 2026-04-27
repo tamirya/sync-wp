@@ -6,6 +6,10 @@ import {
   SyncToStoreModal,
   type SyncToStoreModalMessages,
 } from "@/components/sync-to-store-modal";
+import {
+  SelectionSidePanel,
+  type PanelCategory,
+} from "@/components/selection-side-panel";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -36,11 +40,15 @@ type Messages = {
   selectedLabel: string;
   selectionTotal: string;
   selectionClear: string;
+  selectionPanelTitle: string;
+  selectionPanelCategoriesSection: string;
+  selectionPanelProductsSection: string;
+  selectionPanelEmpty: string;
   syncToStoreButton: string;
 } & SyncToStoreModalMessages;
 
 /* ------------------------------------------------------------------ */
-/*  Constants                                                          */
+/*  Constants                                                           */
 /* ------------------------------------------------------------------ */
 const CARD_GRADIENTS = [
   "from-violet-500 to-purple-600",
@@ -54,22 +62,36 @@ const CARD_GRADIENTS = [
 ];
 
 /* ------------------------------------------------------------------ */
-/*  Helpers                                                             */
+/*  sessionStorage helpers                                              */
 /* ------------------------------------------------------------------ */
-function parsePrice(str: string | null | undefined): number {
-  if (!str) return 0;
-  const n = parseFloat(str.replace(/[^\d.]/g, ""));
-  return isNaN(n) ? 0 : n;
+type PersistedCatItem = PanelCategory;
+
+function storageKey(supplierId: string) {
+  return `supplier_sel_${supplierId}`;
 }
 
-function formatTotal(total: number): string {
-  return (
-    "₪" +
-    total.toLocaleString("he-IL", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
-  );
+function loadSelection(supplierId: string): PersistedCatItem[] {
+  try {
+    const raw = sessionStorage.getItem(storageKey(supplierId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as { catItems?: PersistedCatItem[] };
+    return parsed.catItems ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSelection(supplierId: string, cats: PersistedCatItem[]) {
+  try {
+    const raw = sessionStorage.getItem(storageKey(supplierId));
+    const existing = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    sessionStorage.setItem(
+      storageKey(supplierId),
+      JSON.stringify({ ...existing, catItems: cats }),
+    );
+  } catch {
+    /* ignore */
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -92,28 +114,62 @@ export function SupplierCategoriesClient({
   nameById: Record<number, string>;
   totalCountMap: Record<number, number>;
 }) {
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  /* IDs — for card highlight */
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => {
+    if (typeof window === "undefined") return new Set();
+    const cats = loadSelection(supplierId);
+    return new Set(cats.map((c) => c.id));
+  });
+
+  /* Full items — for panel display */
+  const [panelCatItems, setPanelCatItems] = useState<PersistedCatItem[]>(() => {
+    if (typeof window === "undefined") return [];
+    return loadSelection(supplierId);
+  });
+
   const [syncModalOpen, setSyncModalOpen] = useState(false);
 
   function toggle(id: number) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    const isSelected = selectedIds.has(id);
+    const nextIds = new Set(selectedIds);
+    isSelected ? nextIds.delete(id) : nextIds.add(id);
+    setSelectedIds(nextIds);
+
+    let nextItems: PersistedCatItem[];
+    if (isSelected) {
+      nextItems = panelCatItems.filter((c) => c.id !== id);
+    } else {
+      const cat = rootCategories.find((c) => c.id === id);
+      const count = totalCountMap[id] ?? cat?.count ?? null;
+      nextItems = cat
+        ? [...panelCatItems, { id, name: cat.name, displayCount: count }]
+        : panelCatItems;
+    }
+    setPanelCatItems(nextItems);
+    saveSelection(supplierId, nextItems);
   }
 
+  function clearAll() {
+    setSelectedIds(new Set());
+    setPanelCatItems([]);
+    saveSelection(supplierId, []);
+  }
+
+  /* grand total from products */
   function categoryTotal(catId: number): number {
     return products
       .filter((p) => p.categories.some((c) => c.id === catId))
-      .reduce((sum, p) => sum + parsePrice(p.price ?? p.regularPrice), 0);
+      .reduce(
+        (sum, p) =>
+          sum +
+          parseFloat(
+            (p.price ?? p.regularPrice ?? "0").replace(/[^\d.]/g, "") || "0",
+          ),
+        0,
+      );
   }
 
-  const selectedCategories = rootCategories.filter((c) =>
-    selectedIds.has(c.id),
-  );
-  const grandTotal = selectedCategories.reduce(
+  const grandTotal = panelCatItems.reduce(
     (sum, c) => sum + categoryTotal(c.id),
     0,
   );
@@ -151,7 +207,6 @@ export function SupplierCategoriesClient({
                 href={`/${locale}/suppliers/${supplierId}/categories/${cat.id}`}
                 className={`relative block h-32 w-full shrink-0 overflow-hidden bg-gradient-to-br ${gradient}`}
               >
-                {/* Decorative circles */}
                 <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/10" />
                 <div className="absolute -left-3 bottom-0 h-14 w-14 rounded-full bg-white/10" />
 
@@ -177,7 +232,6 @@ export function SupplierCategoriesClient({
                   </div>
                 )}
 
-                {/* Root / sub badge on image */}
                 <span className="absolute left-2.5 top-2.5 rounded-full bg-black/25 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
                   {isRoot
                     ? messages.storeCategoryRoot
@@ -226,7 +280,6 @@ export function SupplierCategoriesClient({
                   </div>
                 </div>
 
-                {/* Select button — pinned to bottom */}
                 <button
                   onClick={() => toggle(cat.id)}
                   className={`mt-auto w-full rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
@@ -243,90 +296,37 @@ export function SupplierCategoriesClient({
         })}
       </div>
 
-      {/* Bottom selection bar */}
-      {selectedIds.size > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border/60 bg-card/95 shadow-[0_-4px_24px_rgba(0,0,0,0.10)] backdrop-blur-md">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-6 py-4">
-            {/* Selected category chips */}
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-              {selectedCategories.map((c) => {
-                const total = categoryTotal(c.id);
-                const count = totalCountMap[c.id] ?? null;
-                return (
-                  <span
-                    key={c.id}
-                    className="flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary"
-                  >
-                    <span className="max-w-[140px] truncate">{c.name}</span>
-                    {count !== null && (
-                      <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-bold">
-                        {count}
-                      </span>
-                    )}
-                    {total > 0 && (
-                      <span className="text-primary/70">
-                        {formatTotal(total)}
-                      </span>
-                    )}
-                    <button
-                      onClick={() => toggle(c.id)}
-                      className="ml-0.5 text-primary/60 transition-colors hover:text-primary"
-                      aria-label="הסר קטגוריה"
-                    >
-                      ×
-                    </button>
-                  </span>
-                );
-              })}
-            </div>
-
-            {/* Total + actions */}
-            <div className="flex shrink-0 items-center gap-3">
-              {grandTotal > 0 && (
-                <span className="text-sm font-bold text-foreground">
-                  {messages.selectionTotal}: {formatTotal(grandTotal)}
-                </span>
-              )}
-              <button
-                onClick={() => setSyncModalOpen(true)}
-                className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:brightness-110"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="h-3.5 w-3.5 shrink-0"
-                  aria-hidden
-                >
-                  <path d="M1 4v6h6" />
-                  <path d="M23 20v-6h-6" />
-                  <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
-                </svg>
-                {messages.syncToStoreButton}
-              </button>
-              <button
-                onClick={() => setSelectedIds(new Set())}
-                className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-destructive/40 hover:text-destructive"
-              >
-                {messages.selectionClear}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Floating selection side panel */}
+      <SelectionSidePanel
+        selectedCategories={panelCatItems}
+        selectedProducts={[]}
+        grandTotal={grandTotal}
+        onToggleCategory={(id) => toggle(id)}
+        onToggleProduct={() => {}}
+        onClear={clearAll}
+        onSync={() => setSyncModalOpen(true)}
+        messages={{
+          panelTitle: messages.selectionPanelTitle,
+          panelCategoriesSection: messages.selectionPanelCategoriesSection,
+          panelProductsSection: messages.selectionPanelProductsSection,
+          panelEmpty: messages.selectionPanelEmpty,
+          panelTotal: messages.selectionTotal,
+          panelClear: messages.selectionClear,
+          panelSync: messages.syncToStoreButton,
+        }}
+      />
 
       <SyncToStoreModal
         open={syncModalOpen}
         onClose={() => setSyncModalOpen(false)}
         locale={locale}
         supplierId={Number(supplierId)}
-        selectedCategoryIds={Array.from(selectedIds)}
+        selectedCategoryIds={panelCatItems.map((c) => c.id)}
         selectedProductIds={[]}
         messages={messages}
         onSuccess={() => {
           setSyncModalOpen(false);
-          setSelectedIds(new Set());
+          clearAll();
         }}
       />
     </>

@@ -22,6 +22,8 @@ export type LoginMessages = {
   errorWrongPassword: string;
   /** API: `This email … was not found` — use `{{email}}` placeholder */
   errorEmailNotFoundTemplate: string;
+  termsPrefix: string;
+  termsLink: string;
 };
 
 const he: LoginMessages = {
@@ -42,6 +44,8 @@ const he: LoginMessages = {
   errorGeneric: "ההתחברות נכשלה. נסה שוב.",
   errorWrongPassword: "הסיסמה שגויה.",
   errorEmailNotFoundTemplate: "לא נמצא משתמש עבור האימייל {{email}}.",
+  termsPrefix: "אני מאשר את",
+  termsLink: "הסכם השימוש המצורף",
 };
 
 const en: LoginMessages = {
@@ -62,6 +66,8 @@ const en: LoginMessages = {
   errorGeneric: "Sign in failed. Please try again.",
   errorWrongPassword: "The password is incorrect.",
   errorEmailNotFoundTemplate: "No account was found for {{email}}.",
+  termsPrefix: "I agree to the",
+  termsLink: "attached terms of use",
 };
 
 export function getLoginMessages(locale: Locale): LoginMessages {

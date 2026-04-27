@@ -164,7 +164,9 @@ export default async function SupplierCategoriesPage({ params }: Props) {
   function totalCount(catId: number): number {
     const children = childrenByParent.get(catId) ?? [];
     const self = categories.find((c) => c.id === catId)?.count ?? 0;
-    return self + children.reduce((sum, child) => sum + totalCount(child.id), 0);
+    return (
+      self + children.reduce((sum, child) => sum + totalCount(child.id), 0)
+    );
   }
 
   const rootCategories = categories.filter((c) => c.parent === 0);
@@ -267,6 +269,12 @@ export default async function SupplierCategoriesPage({ params }: Props) {
                 selectedLabel: messages.selectedLabel,
                 selectionTotal: messages.selectionTotal,
                 selectionClear: messages.selectionClear,
+                selectionPanelTitle: messages.selectionPanelTitle,
+                selectionPanelCategoriesSection:
+                  messages.selectionPanelCategoriesSection,
+                selectionPanelProductsSection:
+                  messages.selectionPanelProductsSection,
+                selectionPanelEmpty: messages.selectionPanelEmpty,
                 syncToStoreButton: messages.syncToStoreButton,
                 syncModalTitle: messages.syncModalTitle,
                 syncModalSelectStore: messages.syncModalSelectStore,

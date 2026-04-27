@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -173,23 +174,18 @@ export function AppShell({ locale, messages, children }: Props) {
     <aside className="flex h-full w-[17.5rem] shrink-0 flex-col border-shell-sidebar-border bg-shell-sidebar shadow-[2px_0_24px_rgba(15,23,42,0.04)] md:border-e">
       <div className="border-b border-shell-sidebar-border px-5 py-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground shadow-sm ring-1 ring-black/5">
-            <svg
-              viewBox="0 0 24 24"
-              className="h-6 w-6"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M8 12h8M12 8v8M4 12h2M18 12h2" strokeLinecap="round" />
-            </svg>
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl shadow-sm ring-1 ring-black/5">
+            <Image
+              src="/sidebar-logo.svg"
+              alt={messages.brandName}
+              width={44}
+              height={44}
+              className="h-full w-full object-contain"
+            />
           </div>
           <div className="min-w-0">
             <p className="truncate text-base font-bold tracking-tight text-shell-sidebar-foreground">
               {messages.brandName}
-            </p>
-            <p className="text-xs text-shell-sidebar-muted">
-              {messages.brandTagline}
             </p>
           </div>
         </div>

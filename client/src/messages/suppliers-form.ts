@@ -15,6 +15,18 @@ export type SuppliersFormMessages = {
   errorFieldRequired: string;
   errorServerMisconfigured: string;
   errorFromServer: string;
+  deleteSupplier: string;
+  deleteConfirmTitle: string;
+  deleteConfirmMessage: string;
+  deleteConfirmYes: string;
+  deleteConfirmNo: string;
+  deleteFailedAlert: string;
+  termsConfirmTitle: string;
+  termsConfirmPrefix: string;
+  termsConfirmLink: string;
+  termsConfirmSuffix: string;
+  termsConfirmProceed: string;
+  termsConfirmCancel: string;
 };
 
 const he: SuppliersFormMessages = {
@@ -32,6 +44,20 @@ const he: SuppliersFormMessages = {
   errorFieldRequired: "שדה חובה",
   errorServerMisconfigured: "בעיית תצורה או חיבור לשרת.",
   errorFromServer: "שגיאה מהשרת:",
+  deleteSupplier: "מחיקת ספק",
+  deleteConfirmTitle: "מחיקת ספק",
+  deleteConfirmMessage:
+    "האם אתה בטוח שברצונך למחוק את הספק? פעולה זו אינה ניתנת לביטול.",
+  deleteConfirmYes: "מחק",
+  deleteConfirmNo: "ביטול",
+  deleteFailedAlert: "המחיקה נכשלה:",
+  termsConfirmTitle: "אישור הוספת ספק",
+  termsConfirmPrefix:
+    "בלחיצה על המשך אני מאשר כי קיבלתי את רשות הספק להשתמש בתוכן האתר שלו בכפוף ל",
+  termsConfirmLink: "תקנון",
+  termsConfirmSuffix: ".",
+  termsConfirmProceed: "המשך",
+  termsConfirmCancel: "ביטול",
 };
 
 const en: SuppliersFormMessages = {
@@ -49,8 +75,24 @@ const en: SuppliersFormMessages = {
   errorFieldRequired: "This field is required",
   errorServerMisconfigured: "Server connection or configuration error.",
   errorFromServer: "Server error:",
+  deleteSupplier: "Delete supplier",
+  deleteConfirmTitle: "Delete supplier",
+  deleteConfirmMessage:
+    "Are you sure you want to delete this supplier? This action cannot be undone.",
+  deleteConfirmYes: "Delete",
+  deleteConfirmNo: "Cancel",
+  deleteFailedAlert: "Delete failed:",
+  termsConfirmTitle: "Confirm adding supplier",
+  termsConfirmPrefix:
+    "By clicking Continue I confirm that I have received the supplier's permission to use their website content subject to the",
+  termsConfirmLink: "terms of use",
+  termsConfirmSuffix: ".",
+  termsConfirmProceed: "Continue",
+  termsConfirmCancel: "Cancel",
 };
 
-export function getSuppliersFormMessages(locale: Locale): SuppliersFormMessages {
+export function getSuppliersFormMessages(
+  locale: Locale,
+): SuppliersFormMessages {
   return locale === "en" ? en : he;
 }

@@ -29,6 +29,7 @@ export type AppMessages = {
   storeLastSynced: string;
   syncStoreProducts: string;
   syncStoreCategories: string;
+  syncStore: string;
   addAnotherStore: string;
   addAnotherStoreHint: string;
   editStoreAria: string;
@@ -81,6 +82,18 @@ export type AppMessages = {
   mappingBackToList: string;
   mappingNewNoItemsSelected: string;
   mappingNewSaving: string;
+  mappingDraftTitle: string;
+  mappingDraftSources: string;
+  mappingDraftTarget: string;
+  mappingDraftSourcesEmpty: string;
+  mappingDraftSelectTarget: string;
+  mappingDraftSearchTarget: string;
+  mappingDraftSaveRule: string;
+  mappingDraftResetRule: string;
+  mappingDraftNoTarget: string;
+  mappingDraftAddAriaLabel: string;
+  mappingDraftRemoveAriaLabel: string;
+  mappingDraftTargetSearchNoResults: string;
   mappingSyncButton: string;
   mappingSyncing: string;
   mappingSyncSuccess: string;
@@ -110,6 +123,7 @@ export type AppMessages = {
   supplierLastSynced: string;
   syncSupplierProducts: string;
   syncSupplierCategories: string;
+  syncSupplier: string;
   syncSuccessAlert: string;
   syncFailedAlert: string;
   clearWooProducts: string;
@@ -152,6 +166,10 @@ export type AppMessages = {
   selectedLabel: string;
   selectionTotal: string;
   selectionClear: string;
+  selectionPanelTitle: string;
+  selectionPanelCategoriesSection: string;
+  selectionPanelProductsSection: string;
+  selectionPanelEmpty: string;
   syncToStoreButton: string;
   syncModalTitle: string;
   syncModalSelectStore: string;
@@ -192,6 +210,7 @@ const he: AppMessages = {
   storeLastSynced: "סנכרון אחרון",
   syncStoreProducts: "סנכרן מוצרים",
   syncStoreCategories: "סנכרן קטגוריות",
+  syncStore: "סנכרן עכשיו",
   addAnotherStore: "הוסף חנות נוספת",
   addAnotherStoreHint: "לחץ כדי להוסיף חנות חדשה",
   editStoreAria: "עריכת חנות",
@@ -242,6 +261,18 @@ const he: AppMessages = {
   mappingBackToList: "חזרה לרשימה",
   mappingNewNoItemsSelected: "יש לבחור לפחות פריט אחד מכל אחד מהעצים",
   mappingNewSaving: "שומר…",
+  mappingDraftTitle: "כלל חדש",
+  mappingDraftSources: "מקורות (ספק)",
+  mappingDraftTarget: "יעד (חנות)",
+  mappingDraftSourcesEmpty: "הוסף קטגוריות מהעץ ←",
+  mappingDraftSelectTarget: "בחר קטגוריית יעד",
+  mappingDraftSearchTarget: "חיפוש קטגוריה…",
+  mappingDraftSaveRule: "שמור כלל",
+  mappingDraftResetRule: "איפוס",
+  mappingDraftNoTarget: "יש לבחור קטגוריית יעד",
+  mappingDraftAddAriaLabel: "הוסף לכלל",
+  mappingDraftRemoveAriaLabel: "הסר מהכלל",
+  mappingDraftTargetSearchNoResults: "לא נמצאו קטגוריות",
   mappingSyncButton: "סנכן מיפויים",
   mappingSyncing: "מסנכרן…",
   mappingSyncSuccess: "הסנכרון הושלם בהצלחה",
@@ -261,12 +292,13 @@ const he: AppMessages = {
   confirmYes: "כן",
   confirmNo: "לא",
   deleteConfirmTitle: "מחיקה",
-  supplierStatusOk: "תקין",
+  supplierStatusOk: "מחובר",
   supplierTotalProducts: "סה״כ מוצרים בקטלוג",
   supplierTotalCategories: "סה״כ קטגוריות",
   supplierLastSynced: "סנכרון אחרון",
   syncSupplierProducts: "סנכרן מוצרים",
   syncSupplierCategories: "סנכרן קטגוריות",
+  syncSupplier: "סנכרון",
   syncSuccessAlert: "הסנכרון הושלם בהצלחה",
   syncFailedAlert: "הסנכרון נכשל:",
   clearWooProducts: "מחיקת כל המוצרים מהחנות",
@@ -311,7 +343,11 @@ const he: AppMessages = {
   selectLabel: "בחר",
   selectedLabel: "נבחר ✓",
   selectionTotal: "סה״כ",
-  selectionClear: "נקה",
+  selectionClear: "נקה הכל",
+  selectionPanelTitle: "פריטים נבחרים",
+  selectionPanelCategoriesSection: "קטגוריות",
+  selectionPanelProductsSection: "מוצרים",
+  selectionPanelEmpty: "בחר מוצרים או קטגוריות",
   syncToStoreButton: "סנכרן לחנות",
   syncModalTitle: "סנכרן לחנות",
   syncModalSelectStore: "בחר חנות",
@@ -352,6 +388,7 @@ const en: AppMessages = {
   storeLastSynced: "LAST SYNCED",
   syncStoreProducts: "Sync products",
   syncStoreCategories: "Sync categories",
+  syncStore: "Sync now",
   addAnotherStore: "Add Another Store",
   addAnotherStoreHint: "Click here to add a new store",
   editStoreAria: "Edit store",
@@ -405,6 +442,18 @@ const en: AppMessages = {
   mappingBackToList: "Back to list",
   mappingNewNoItemsSelected: "Please select at least one item from each tree",
   mappingNewSaving: "Saving…",
+  mappingDraftTitle: "New rule",
+  mappingDraftSources: "Sources (supplier)",
+  mappingDraftTarget: "Target (store)",
+  mappingDraftSourcesEmpty: "Add categories from the tree →",
+  mappingDraftSelectTarget: "Select target category",
+  mappingDraftSearchTarget: "Search category…",
+  mappingDraftSaveRule: "Save rule",
+  mappingDraftResetRule: "Reset",
+  mappingDraftNoTarget: "Please select a target category",
+  mappingDraftAddAriaLabel: "Add to rule",
+  mappingDraftRemoveAriaLabel: "Remove from rule",
+  mappingDraftTargetSearchNoResults: "No categories found",
   mappingSyncButton: "Sync Mappings",
   mappingSyncing: "Syncing…",
   mappingSyncSuccess: "Sync completed successfully",
@@ -430,6 +479,7 @@ const en: AppMessages = {
   supplierLastSynced: "Last synced",
   syncSupplierProducts: "Sync products",
   syncSupplierCategories: "Sync categories",
+  syncSupplier: "Sync",
   syncSuccessAlert: "Sync completed successfully",
   syncFailedAlert: "Sync failed:",
   clearWooProducts: "Delete all products from store",
@@ -475,7 +525,11 @@ const en: AppMessages = {
   selectLabel: "Select",
   selectedLabel: "Selected ✓",
   selectionTotal: "Total",
-  selectionClear: "Clear",
+  selectionClear: "Clear all",
+  selectionPanelTitle: "Selected items",
+  selectionPanelCategoriesSection: "Categories",
+  selectionPanelProductsSection: "Products",
+  selectionPanelEmpty: "Select products or categories",
   syncToStoreButton: "Sync to store",
   syncModalTitle: "Sync to store",
   syncModalSelectStore: "Select store",

@@ -3,14 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, useEffect, useRef } from "react";
-import { deleteStoreAction } from "@/app/actions/delete-entities";
 import {
   syncStoreProductsAction,
   syncStoreCategoriesAction,
-  clearStoreWooProductsAction,
-  clearStoreWooCategoriesAction,
 } from "@/app/actions/sync-store";
-import { ConfirmModal } from "@/components/confirm-modal";
 import type { Locale } from "@/i18n/config";
 import type { StoreCardData } from "@/lib/stores-api";
 import type { AppMessages } from "@/messages/app";
@@ -135,16 +131,8 @@ function StoreCardItem({
   messages: AppMessages;
 }) {
   const router = useRouter();
-  const [deletePending, startDeleteTransition] = useTransition();
-  const [syncProductsPending, startSyncProductsTransition] = useTransition();
-  const [syncCategoriesPending, startSyncCategoriesTransition] =
-    useTransition();
-  const [clearWooPending, startClearWooTransition] = useTransition();
-  const [clearWooCatPending, startClearWooCatTransition] = useTransition();
+  const [syncPending, startSyncTransition] = useTransition();
 
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [clearWooOpen, setClearWooOpen] = useState(false);
-  const [clearWooCatOpen, setClearWooCatOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const menuRef = useRef<HTMLDivElement>(null);
@@ -161,67 +149,19 @@ function StoreCardItem({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menuOpen]);
 
-  const anyPending =
-    deletePending ||
-    syncProductsPending ||
-    syncCategoriesPending ||
-    clearWooPending ||
-    clearWooCatPending;
+  const anyPending = syncPending;
 
-  function executeDelete() {
-    setDeleteOpen(false);
-    startDeleteTransition(async () => {
-      const r = await deleteStoreAction(locale, store.id);
-      if (!r.ok) {
-        window.alert(`${messages.deleteFailedAlert} ${r.message}`);
-        return;
-      }
-      router.refresh();
-    });
-  }
-
-  function executeSyncProducts() {
+  function executeSync() {
     setMenuOpen(false);
-    startSyncProductsTransition(async () => {
-      const r = await syncStoreProductsAction(locale, store.id);
-      if (!r.ok) {
-        window.alert(`${messages.syncFailedAlert} ${r.message}`);
+    startSyncTransition(async () => {
+      const rProducts = await syncStoreProductsAction(locale, store.id);
+      if (!rProducts.ok) {
+        window.alert(`${messages.syncFailedAlert} ${rProducts.message}`);
         return;
       }
-      router.refresh();
-    });
-  }
-
-  function executeSyncCategories() {
-    setMenuOpen(false);
-    startSyncCategoriesTransition(async () => {
-      const r = await syncStoreCategoriesAction(locale, store.id);
-      if (!r.ok) {
-        window.alert(`${messages.syncFailedAlert} ${r.message}`);
-        return;
-      }
-      router.refresh();
-    });
-  }
-
-  function executeClearWoo() {
-    setClearWooOpen(false);
-    startClearWooTransition(async () => {
-      const r = await clearStoreWooProductsAction(locale, store.id);
-      if (!r.ok) {
-        window.alert(`${messages.clearWooProductsFailedAlert} ${r.message}`);
-        return;
-      }
-      router.refresh();
-    });
-  }
-
-  function executeClearWooCategories() {
-    setClearWooCatOpen(false);
-    startClearWooCatTransition(async () => {
-      const r = await clearStoreWooCategoriesAction(locale, store.id);
-      if (!r.ok) {
-        window.alert(`${messages.clearWooCategoriesFailedAlert} ${r.message}`);
+      const rCategories = await syncStoreCategoriesAction(locale, store.id);
+      if (!rCategories.ok) {
+        window.alert(`${messages.syncFailedAlert} ${rCategories.message}`);
         return;
       }
       router.refresh();
@@ -256,19 +196,6 @@ function StoreCardItem({
       <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
     </svg>
   );
-  const TrashIcon = (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      className="h-4 w-4"
-      aria-hidden
-    >
-      <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14zM10 11v6M14 11v6" />
-    </svg>
-  );
-
   const gradient =
     STORE_GRADIENTS[parseInt(store.id, 10) % STORE_GRADIENTS.length];
 
@@ -347,48 +274,9 @@ function StoreCardItem({
 
                 <MenuItem
                   icon={SyncIcon}
-                  label={messages.syncStoreProducts}
-                  onClick={executeSyncProducts}
-                  pending={syncProductsPending}
-                />
-                <MenuItem
-                  icon={SyncIcon}
-                  label={messages.syncStoreCategories}
-                  onClick={executeSyncCategories}
-                  pending={syncCategoriesPending}
-                />
-
-                <div className="my-1 border-t border-border/60" />
-
-                <MenuItem
-                  icon={TrashIcon}
-                  label={messages.clearWooProducts}
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setClearWooOpen(true);
-                  }}
-                  pending={clearWooPending}
-                  destructive
-                />
-                <MenuItem
-                  icon={TrashIcon}
-                  label={messages.clearWooCategories}
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setClearWooCatOpen(true);
-                  }}
-                  pending={clearWooCatPending}
-                  destructive
-                />
-                <MenuItem
-                  icon={TrashIcon}
-                  label={messages.deleteStoreAria}
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setDeleteOpen(true);
-                  }}
-                  pending={deletePending}
-                  destructive
+                  label={messages.syncStore}
+                  onClick={executeSync}
+                  pending={syncPending}
                 />
               </div>
             )}
@@ -437,37 +325,6 @@ function StoreCardItem({
           </p>
         </div>
       </article>
-
-      <ConfirmModal
-        open={deleteOpen}
-        dir={locale === "he" ? "rtl" : "ltr"}
-        title={messages.deleteConfirmTitle}
-        message={messages.confirmDeleteStore}
-        labelConfirm={messages.confirmYes}
-        labelCancel={messages.confirmNo}
-        onConfirm={executeDelete}
-        onCancel={() => setDeleteOpen(false)}
-      />
-      <ConfirmModal
-        open={clearWooOpen}
-        dir={locale === "he" ? "rtl" : "ltr"}
-        title={messages.clearWooProductsConfirmTitle}
-        message={messages.confirmClearWooProducts}
-        labelConfirm={messages.confirmYes}
-        labelCancel={messages.confirmNo}
-        onConfirm={executeClearWoo}
-        onCancel={() => setClearWooOpen(false)}
-      />
-      <ConfirmModal
-        open={clearWooCatOpen}
-        dir={locale === "he" ? "rtl" : "ltr"}
-        title={messages.clearWooCategoriesConfirmTitle}
-        message={messages.confirmClearWooCategories}
-        labelConfirm={messages.confirmYes}
-        labelCancel={messages.confirmNo}
-        onConfirm={executeClearWooCategories}
-        onCancel={() => setClearWooCatOpen(false)}
-      />
     </>
   );
 }

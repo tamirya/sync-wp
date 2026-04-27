@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 import type { Locale } from "@/i18n/config";
 import {
@@ -9,13 +10,53 @@ import {
   type StoreFormField,
   type StoreFormState,
 } from "@/app/actions/stores";
+import { deleteStoreAction } from "@/app/actions/delete-entities";
+import { ConfirmModal } from "@/components/confirm-modal";
 import type { StoresFormMessages } from "@/messages/stores-form";
 
-function SubmitButton({
-  label,
-}: {
-  label: string;
-}) {
+function InfoTooltip({ text, dir }: { text: string; dir: "rtl" | "ltr" }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-flex items-center">
+      <button
+        type="button"
+        aria-label="מידע נוסף"
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        className="flex h-4 w-4 items-center justify-center rounded-full bg-muted/40 text-muted transition hover:bg-primary/15 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          className="h-3 w-3"
+          aria-hidden
+        >
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 16v-4M12 8h.01" strokeLinecap="round" />
+        </svg>
+      </button>
+      {open && (
+        <span
+          role="tooltip"
+          className={`pointer-events-none absolute bottom-full z-50 mb-2 w-64 rounded-xl border border-border bg-card px-3 py-2.5 text-xs leading-relaxed text-foreground shadow-lg ring-1 ring-black/5 ${dir === "rtl" ? "end-0 text-right" : "start-0 text-left"}`}
+        >
+          {text}
+          <span
+            className={`absolute top-full h-2 w-2 overflow-hidden ${dir === "rtl" ? "end-2" : "start-2"}`}
+          >
+            <span className="absolute -top-1 left-0 h-2 w-2 rotate-45 border border-border bg-card" />
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
+function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
     <button
@@ -56,6 +97,8 @@ type FieldRowProps = {
   autoComplete?: string;
   blockAutofill?: boolean;
   error?: string;
+  tooltip?: string;
+  dir?: "rtl" | "ltr";
 };
 
 function FieldRow({
@@ -69,6 +112,8 @@ function FieldRow({
   autoComplete,
   blockAutofill,
   error,
+  tooltip,
+  dir = "ltr",
 }: FieldRowProps) {
   const ac =
     blockAutofill === true
@@ -87,9 +132,12 @@ function FieldRow({
           : "ring-border/80 focus-within:ring-ring"
       }`}
     >
-      <label htmlFor={id} className="text-sm font-bold text-primary">
-        {label}
-      </label>
+      <div className="flex items-center gap-1.5">
+        <label htmlFor={id} className="text-sm font-bold text-primary">
+          {label}
+        </label>
+        {tooltip && <InfoTooltip text={tooltip} dir={dir} />}
+      </div>
       <input
         id={id}
         name={name}
@@ -142,6 +190,22 @@ export function StoreForm({
   initial,
 }: Props) {
   const dir = locale === "he" ? "rtl" : "ltr";
+  const router = useRouter();
+
+  const [removeOpen, setRemoveOpen] = useState(false);
+  const [removePending, startRemoveTransition] = useTransition();
+
+  function executeRemove() {
+    setRemoveOpen(false);
+    startRemoveTransition(async () => {
+      const r = await deleteStoreAction(locale, storeId!);
+      if (!r.ok) {
+        window.alert(`${messages.removeFailedAlert} ${r.message}`);
+        return;
+      }
+      router.push(`/${locale}/stores`);
+    });
+  }
 
   const [values, setValues] = useState<FormValues>(() => fromInitial(initial));
 
@@ -217,7 +281,11 @@ export function StoreForm({
           strokeWidth="2"
           aria-hidden
         >
-          <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M19 12H5M12 19l-7-7 7-7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
         {messages.back}
       </Link>
@@ -241,6 +309,8 @@ export function StoreForm({
           onChange={(v) => patchField("name", v)}
           autoComplete="organization"
           error={fieldError("name")}
+          tooltip={messages.tooltipName}
+          dir={dir}
         />
         <FieldRow
           id="sf-url"
@@ -251,6 +321,8 @@ export function StoreForm({
           onChange={(v) => patchField("url", v)}
           autoComplete="url"
           error={fieldError("url")}
+          tooltip={messages.tooltipUrl}
+          dir={dir}
         />
         <FieldRow
           id="sf-port"
@@ -262,6 +334,8 @@ export function StoreForm({
           onChange={(v) => patchField("port", v)}
           autoComplete="off"
           error={fieldError("port")}
+          tooltip={messages.tooltipPort}
+          dir={dir}
         />
         <FieldRow
           id="sf-key"
@@ -272,6 +346,8 @@ export function StoreForm({
           onChange={(v) => patchField("consumerKey", v)}
           autoComplete="off"
           error={fieldError("consumerKey")}
+          tooltip={messages.tooltipApiKey}
+          dir={dir}
         />
         <FieldRow
           id="sf-secret"
@@ -283,6 +359,8 @@ export function StoreForm({
           onChange={(v) => patchField("consumerSecret", v)}
           autoComplete="off"
           error={fieldError("consumerSecret")}
+          tooltip={messages.tooltipApiSecret}
+          dir={dir}
         />
 
         {showBanner ? (
@@ -298,6 +376,45 @@ export function StoreForm({
           <SubmitButton label={submitLabel} />
         </div>
       </form>
+
+      {mode === "edit" && (
+        <div className="mt-10 border-t border-border/60 pt-8">
+          <button
+            type="button"
+            disabled={removePending}
+            onClick={() => setRemoveOpen(true)}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-destructive/40 bg-destructive/5 px-6 py-3.5 text-base font-bold text-destructive transition hover:bg-destructive/10 disabled:opacity-60"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="h-5 w-5 shrink-0"
+              aria-hidden
+            >
+              <path
+                d="M18 6L6 18M6 6l12 12"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            {removePending ? "…" : messages.removeStore}
+          </button>
+        </div>
+      )}
+
+      <ConfirmModal
+        open={removeOpen}
+        dir={dir}
+        danger={false}
+        title={messages.removeConfirmTitle}
+        message={messages.removeConfirmMessage}
+        labelConfirm={messages.removeConfirmYes}
+        labelCancel={messages.removeConfirmNo}
+        onConfirm={executeRemove}
+        onCancel={() => setRemoveOpen(false)}
+      />
     </div>
   );
 }

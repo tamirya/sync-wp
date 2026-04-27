@@ -9,6 +9,8 @@ type Props = {
   dir: "rtl" | "ltr";
   /** Primary line (e.g. delete warning) */
   message: string;
+  /** Rich content to render instead of `message` when a link/JSX is needed */
+  messageNode?: React.ReactNode;
   /** Optional heading above the message */
   title?: string;
   labelConfirm: string;
@@ -26,6 +28,7 @@ export function ConfirmModal({
   open,
   dir,
   message,
+  messageNode,
   title,
   labelConfirm,
   labelCancel,
@@ -94,7 +97,7 @@ export function ConfirmModal({
           id="confirm-modal-desc"
           className={`text-base leading-relaxed text-muted ${title ? "mt-4 text-start" : ""}`}
         >
-          {message}
+          {messageNode ?? message}
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
           <button

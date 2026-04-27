@@ -5,6 +5,10 @@ import {
   SyncToStoreModal,
   type SyncToStoreModalMessages,
 } from "@/components/sync-to-store-modal";
+import {
+  SelectionSidePanel,
+  type SelectionSidePanelMessages,
+} from "@/components/selection-side-panel";
 
 const PAGE_SIZE = 24;
 
@@ -35,6 +39,10 @@ type Messages = {
   selectedLabel: string;
   selectionTotal: string;
   selectionClear: string;
+  selectionPanelTitle: string;
+  selectionPanelCategoriesSection: string;
+  selectionPanelProductsSection: string;
+  selectionPanelEmpty: string;
   syncToStoreButton: string;
 } & SyncToStoreModalMessages;
 
@@ -45,16 +53,6 @@ function parsePrice(str: string | null | undefined): number {
   if (!str) return 0;
   const n = parseFloat(str.replace(/[^\d.]/g, ""));
   return isNaN(n) ? 0 : n;
-}
-
-function formatTotal(total: number): string {
-  return (
-    "₪" +
-    total.toLocaleString("he-IL", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
-  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -89,7 +87,9 @@ function StockBadge({
         : "bg-amber-100 text-amber-700 ring-amber-200";
 
   return (
-    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${cls}`}>
+    <span
+      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${cls}`}
+    >
       {label}
     </span>
   );
@@ -123,7 +123,9 @@ export function SupplierProductsClient({
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
-          setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, products.length));
+          setVisibleCount((prev) =>
+            Math.min(prev + PAGE_SIZE, products.length),
+          );
         }
       },
       { rootMargin: "200px" },
@@ -171,7 +173,7 @@ export function SupplierProductsClient({
 
   return (
     <>
-      <div className="grid gap-4 pb-24 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {visibleProducts.map((product) => {
           const isSelected = selectedIds.has(product.id);
           const imgSrc = product.image?.src ?? null;
@@ -332,61 +334,31 @@ export function SupplierProductsClient({
         )}
       </div>
 
-      {/* Bottom selection bar */}
-      {selectedIds.size > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border/60 bg-card/95 shadow-[0_-4px_24px_rgba(0,0,0,0.10)] backdrop-blur-md">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-6 py-4">
-            {/* Selected product chips */}
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-              {selectedProducts.map((p) => (
-                <span
-                  key={p.id}
-                  className="flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary"
-                >
-                  <span className="max-w-[130px] truncate">{p.name}</span>
-                  {(p.price ?? p.regularPrice) && (
-                    <span className="text-primary/70">
-                      {p.price ?? p.regularPrice}
-                    </span>
-                  )}
-                  <button
-                    onClick={() => toggle(p.id)}
-                    className="ml-0.5 text-primary/60 transition-colors hover:text-primary"
-                    aria-label="הסר מוצר"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-
-            {/* Total + actions */}
-            <div className="flex shrink-0 items-center gap-3">
-              {grandTotal > 0 && (
-                <span className="text-sm font-bold text-foreground">
-                  {messages.selectionTotal}: {formatTotal(grandTotal)}
-                </span>
-              )}
-              <button
-                onClick={() => setSyncModalOpen(true)}
-                className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:brightness-110"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0" aria-hidden>
-                  <path d="M1 4v6h6" /><path d="M23 20v-6h-6" />
-                  <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
-                </svg>
-                {messages.syncToStoreButton}
-              </button>
-              <button
-                onClick={() => setSelectedIds(new Set())}
-                className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-destructive/40 hover:text-destructive"
-              >
-                {messages.selectionClear}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Floating selection side panel */}
+      <SelectionSidePanel
+        selectedCategories={[]}
+        selectedProducts={selectedProducts.map((p) => ({
+          id: p.id,
+          name: p.name,
+          sku: p.sku,
+          price: p.price,
+          regularPrice: p.regularPrice,
+        }))}
+        grandTotal={grandTotal}
+        onToggleCategory={() => {}}
+        onToggleProduct={toggle}
+        onClear={() => setSelectedIds(new Set())}
+        onSync={() => setSyncModalOpen(true)}
+        messages={{
+          panelTitle: messages.selectionPanelTitle,
+          panelCategoriesSection: messages.selectionPanelCategoriesSection,
+          panelProductsSection: messages.selectionPanelProductsSection,
+          panelEmpty: messages.selectionPanelEmpty,
+          panelTotal: messages.selectionTotal,
+          panelClear: messages.selectionClear,
+          panelSync: messages.syncToStoreButton,
+        }}
+      />
 
       <SyncToStoreModal
         open={syncModalOpen}

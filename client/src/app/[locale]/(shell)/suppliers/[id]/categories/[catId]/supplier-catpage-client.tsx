@@ -6,6 +6,10 @@ import {
   SyncToStoreModal,
   type SyncToStoreModalMessages,
 } from "@/components/sync-to-store-modal";
+import {
+  SelectionSidePanel,
+  type SelectionSidePanelMessages,
+} from "@/components/selection-side-panel";
 
 const PAGE_SIZE = 24;
 
@@ -51,6 +55,10 @@ type Messages = {
   selectedLabel: string;
   selectionTotal: string;
   selectionClear: string;
+  selectionPanelTitle: string;
+  selectionPanelCategoriesSection: string;
+  selectionPanelProductsSection: string;
+  selectionPanelEmpty: string;
   syncToStoreButton: string;
 } & SyncToStoreModalMessages;
 
@@ -75,16 +83,6 @@ function parsePrice(str: string | null | undefined): number {
   if (!str) return 0;
   const n = parseFloat(str.replace(/[^\d.]/g, ""));
   return isNaN(n) ? 0 : n;
-}
-
-function formatTotal(total: number): string {
-  return (
-    "₪" +
-    total.toLocaleString("he-IL", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
-  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -400,8 +398,54 @@ function ProductCard({
 }
 
 /* ------------------------------------------------------------------ */
+/*  sessionStorage helpers                                              */
+/* ------------------------------------------------------------------ */
+
+type PersistedCatItem = {
+  id: number;
+  name: string;
+  displayCount: number | null | undefined;
+  parentName: string | undefined;
+};
+type PersistedProdItem = {
+  id: number;
+  name: string;
+  sku: string;
+  price: string | null;
+  regularPrice: string | null;
+  parentName: string | undefined;
+};
+type PersistedSelection = {
+  catItems: PersistedCatItem[];
+  prodItems: PersistedProdItem[];
+};
+
+function storageKey(supplierId: number) {
+  return `supplier_sel_${supplierId}`;
+}
+
+function loadSelection(supplierId: number): PersistedSelection {
+  try {
+    const raw = sessionStorage.getItem(storageKey(supplierId));
+    if (!raw) return { catItems: [], prodItems: [] };
+    return JSON.parse(raw) as PersistedSelection;
+  } catch {
+    return { catItems: [], prodItems: [] };
+  }
+}
+
+function saveSelection(supplierId: number, sel: PersistedSelection) {
+  try {
+    sessionStorage.setItem(storageKey(supplierId), JSON.stringify(sel));
+  } catch {
+    /* ignore storage errors */
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /*  Unified page client                                                 */
 /* ------------------------------------------------------------------ */
+
 export function SupplierCatPageClient({
   subCategories,
   products,
@@ -409,6 +453,7 @@ export function SupplierCatPageClient({
   messages,
   locale,
   supplierId,
+  currentCategoryName,
 }: {
   subCategories: ClientSubCategory[];
   products: ClientProduct[];
@@ -416,14 +461,40 @@ export function SupplierCatPageClient({
   messages: Messages;
   locale: string;
   supplierId: number;
+  currentCategoryName?: string;
 }) {
-  const [selectedCatIds, setSelectedCatIds] = useState<Set<number>>(new Set());
-  const [selectedProdIds, setSelectedProdIds] = useState<Set<number>>(
-    new Set(),
+  /* IDs — used for card highlight UI on the current page */
+  const [selectedCatIds, setSelectedCatIds] = useState<Set<number>>(() => {
+    if (typeof window === "undefined") return new Set();
+    const sel = loadSelection(supplierId);
+    return new Set(sel.catItems.map((c) => c.id));
+  });
+  const [selectedProdIds, setSelectedProdIds] = useState<Set<number>>(() => {
+    if (typeof window === "undefined") return new Set();
+    const sel = loadSelection(supplierId);
+    return new Set(sel.prodItems.map((p) => p.id));
+  });
+
+  /* Full item data — displayed in the panel across all category pages */
+  const [panelCatItems, setPanelCatItems] = useState<PersistedCatItem[]>(() => {
+    if (typeof window === "undefined") return [];
+    return loadSelection(supplierId).catItems;
+  });
+  const [panelProdItems, setPanelProdItems] = useState<PersistedProdItem[]>(
+    () => {
+      if (typeof window === "undefined") return [];
+      return loadSelection(supplierId).prodItems;
+    },
   );
+
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  /* Helper — save immediately (not deferred) so rapid navigation can't lose data */
+  function persist(cats: PersistedCatItem[], prods: PersistedProdItem[]) {
+    saveSelection(supplierId, { catItems: cats, prodItems: prods });
+  }
 
   const visibleProducts = products.slice(0, visibleCount);
   const hasMore = visibleCount < products.length;
@@ -445,31 +516,73 @@ export function SupplierCatPageClient({
   }, [hasMore, products.length]);
 
   function toggleCat(id: number) {
-    setSelectedCatIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    const isSelected = selectedCatIds.has(id);
+    const nextCatIds = new Set(selectedCatIds);
+    isSelected ? nextCatIds.delete(id) : nextCatIds.add(id);
+    setSelectedCatIds(nextCatIds);
+
+    let nextCatItems: PersistedCatItem[];
+    if (isSelected) {
+      nextCatItems = panelCatItems.filter((c) => c.id !== id);
+    } else {
+      const sub = subCategories.find((c) => c.id === id);
+      nextCatItems = sub
+        ? [
+            ...panelCatItems,
+            {
+              id,
+              name: sub.name,
+              displayCount: sub.displayCount,
+              parentName: currentCategoryName,
+            },
+          ]
+        : panelCatItems;
+    }
+    setPanelCatItems(nextCatItems);
+    persist(nextCatItems, panelProdItems);
   }
 
   function toggleProd(id: number) {
-    setSelectedProdIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    const isSelected = selectedProdIds.has(id);
+    const nextProdIds = new Set(selectedProdIds);
+    isSelected ? nextProdIds.delete(id) : nextProdIds.add(id);
+    setSelectedProdIds(nextProdIds);
+
+    let nextProdItems: PersistedProdItem[];
+    if (isSelected) {
+      nextProdItems = panelProdItems.filter((p) => p.id !== id);
+    } else {
+      const prod = products.find((p) => p.id === id);
+      nextProdItems = prod
+        ? [
+            ...panelProdItems,
+            {
+              id,
+              name: prod.name,
+              sku: prod.sku,
+              price: prod.price,
+              regularPrice: prod.regularPrice,
+              parentName: currentCategoryName,
+            },
+          ]
+        : panelProdItems;
+    }
+    setPanelProdItems(nextProdItems);
+    persist(panelCatItems, nextProdItems);
   }
 
-  const selectedCats = subCategories.filter((c) => selectedCatIds.has(c.id));
-  const selectedProds = products.filter((p) => selectedProdIds.has(p.id));
-  const grandTotal = selectedProds.reduce(
+  function clearAll() {
+    setSelectedCatIds(new Set());
+    setSelectedProdIds(new Set());
+    setPanelCatItems([]);
+    setPanelProdItems([]);
+    persist([], []);
+  }
+
+  const grandTotal = panelProdItems.reduce(
     (sum, p) => sum + parsePrice(p.price ?? p.regularPrice),
     0,
   );
-  const anySelected = selectedCatIds.size > 0 || selectedProdIds.size > 0;
-
   return (
     <>
       {/* Sub-categories section */}
@@ -527,7 +640,7 @@ export function SupplierCatPageClient({
           </div>
         ) : (
           <>
-            <div className="grid gap-4 pb-24 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {visibleProducts.map((product) => (
                 <ProductCard
                   key={product.id}
@@ -563,128 +676,37 @@ export function SupplierCatPageClient({
         )}
       </section>
 
-      {/* Combined bottom selection bar */}
-      {anySelected && (
-        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border/60 bg-card/95 shadow-[0_-4px_24px_rgba(0,0,0,0.10)] backdrop-blur-md">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-6 py-4">
-            {/* Chips */}
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-              {/* Category chips */}
-              {selectedCats.map((c) => (
-                <span
-                  key={`cat-${c.id}`}
-                  className="flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary"
-                >
-                  <svg
-                    viewBox="0 0 16 16"
-                    fill="currentColor"
-                    className="h-3 w-3 shrink-0"
-                    aria-hidden
-                  >
-                    <path d="M3 3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1H8.5L7 3H3z" />
-                  </svg>
-                  <span className="max-w-[130px] truncate">{c.name}</span>
-                  {c.displayCount !== null && (
-                    <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-bold">
-                      {c.displayCount}
-                    </span>
-                  )}
-                  <button
-                    onClick={() => toggleCat(c.id)}
-                    className="ml-0.5 text-primary/60 transition-colors hover:text-primary"
-                    aria-label="הסר קטגוריה"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-
-              {/* Product chips */}
-              {selectedProds.map((p) => (
-                <span
-                  key={`prod-${p.id}`}
-                  className="flex items-center gap-2 rounded-full border border-cyan-300/50 bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-700"
-                >
-                  <svg
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    className="h-3 w-3 shrink-0"
-                    aria-hidden
-                  >
-                    <rect x="2" y="2" width="12" height="12" rx="1.5" />
-                    <circle cx="5.5" cy="5.5" r="1" />
-                    <path d="M14 10 10 6 2 14" />
-                  </svg>
-                  <span className="max-w-[130px] truncate">{p.name}</span>
-                  {(p.price ?? p.regularPrice) && (
-                    <span className="text-cyan-600/80">
-                      {p.price ?? p.regularPrice}
-                    </span>
-                  )}
-                  <button
-                    onClick={() => toggleProd(p.id)}
-                    className="ml-0.5 text-cyan-600/60 transition-colors hover:text-cyan-700"
-                    aria-label="הסר מוצר"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-
-            {/* Total + actions */}
-            <div className="flex shrink-0 items-center gap-3">
-              {grandTotal > 0 && (
-                <span className="text-sm font-bold text-foreground">
-                  {messages.selectionTotal}: {formatTotal(grandTotal)}
-                </span>
-              )}
-              <button
-                onClick={() => setSyncModalOpen(true)}
-                className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:brightness-110"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="h-3.5 w-3.5 shrink-0"
-                  aria-hidden
-                >
-                  <path d="M1 4v6h6" />
-                  <path d="M23 20v-6h-6" />
-                  <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
-                </svg>
-                {messages.syncToStoreButton}
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedCatIds(new Set());
-                  setSelectedProdIds(new Set());
-                }}
-                className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-destructive/40 hover:text-destructive"
-              >
-                {messages.selectionClear}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Floating selection side panel */}
+      <SelectionSidePanel
+        selectedCategories={panelCatItems}
+        selectedProducts={panelProdItems}
+        grandTotal={grandTotal}
+        onToggleCategory={toggleCat}
+        onToggleProduct={toggleProd}
+        onClear={clearAll}
+        onSync={() => setSyncModalOpen(true)}
+        messages={{
+          panelTitle: messages.selectionPanelTitle,
+          panelCategoriesSection: messages.selectionPanelCategoriesSection,
+          panelProductsSection: messages.selectionPanelProductsSection,
+          panelEmpty: messages.selectionPanelEmpty,
+          panelTotal: messages.selectionTotal,
+          panelClear: messages.selectionClear,
+          panelSync: messages.syncToStoreButton,
+        }}
+      />
 
       <SyncToStoreModal
         open={syncModalOpen}
         onClose={() => setSyncModalOpen(false)}
         locale={locale}
         supplierId={supplierId}
-        selectedCategoryIds={Array.from(selectedCatIds)}
-        selectedProductIds={Array.from(selectedProdIds)}
+        selectedCategoryIds={panelCatItems.map((c) => c.id)}
+        selectedProductIds={panelProdItems.map((p) => p.id)}
         messages={messages}
         onSuccess={() => {
           setSyncModalOpen(false);
-          setSelectedCatIds(new Set());
-          setSelectedProdIds(new Set());
+          clearAll();
         }}
       />
     </>
