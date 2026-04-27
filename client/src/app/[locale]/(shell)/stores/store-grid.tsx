@@ -269,7 +269,8 @@ function StoreCardItem({
     </svg>
   );
 
-  const gradient = STORE_GRADIENTS[store.id % STORE_GRADIENTS.length];
+  const gradient =
+    STORE_GRADIENTS[parseInt(store.id, 10) % STORE_GRADIENTS.length];
 
   return (
     <>
