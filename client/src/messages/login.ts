@@ -44,7 +44,7 @@ const he: LoginMessages = {
   errorGeneric: "ההתחברות נכשלה. נסה שוב.",
   errorWrongPassword: "הסיסמה שגויה.",
   errorEmailNotFoundTemplate: "לא נמצא משתמש עבור האימייל {{email}}.",
-  termsPrefix: "אני מאשר את",
+  termsPrefix: "בלחיצה על כפתור כניסה אני מאשר את",
   termsLink: "הסכם השימוש המצורף",
 };
 
