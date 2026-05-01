@@ -137,12 +137,7 @@ function normalizeBaseUrl(url: string): string {
   return url.replace(/\/+$/, '').replace(/\/wp-json\/.*$/, '');
 }
 
-function createTargetWooClient(
-  storeUrl: string,
-  consumerKey: string,
-  consumerSecret: string,
-  port?: number | null,
-): WooRestClient {
+function createTargetWooClient(storeUrl: string, consumerKey: string, consumerSecret: string, port?: number | null): WooRestClient {
   return new WooCommerceRestApi({
     url: storeUrl,
     consumerKey,
@@ -171,10 +166,7 @@ function safeDecodeSlug(slug: string): string {
   }
 }
 
-function storePriceToWoo(
-  prices: StoreApiPrices,
-  onSale: boolean,
-): { regular_price: string; sale_price?: string } {
+function storePriceToWoo(prices: StoreApiPrices, onSale: boolean): { regular_price: string; sale_price?: string } {
   const minor = Number.isFinite(prices.currency_minor_unit) ? prices.currency_minor_unit : 0;
   const div = 10 ** minor;
   const toMajor = (s: string): string => {
@@ -201,9 +193,7 @@ function mapStoreApiProductToWooLike(p: StoreApiProduct): SupplierCatalogWooLike
     description: decodeHtmlEntities(p.description ?? ''),
     short_description: decodeHtmlEntities(p.short_description ?? ''),
     categories: (p.categories ?? []).map(c => ({ id: c.id })),
-    images: (p.images ?? [])
-      .map(img => ({ src: img.src }))
-      .filter((i): i is { src: string } => Boolean(i.src)),
+    images: (p.images ?? []).map(img => ({ src: img.src })).filter((i): i is { src: string } => Boolean(i.src)),
   };
 }
 
@@ -213,8 +203,7 @@ const SUPPLIER_BROWSER_HEADERS: Record<string, string> = {
   Accept: 'application/json, text/plain, */*',
   'Accept-Language': 'en-US,en;q=0.9',
   'Accept-Encoding': 'identity',
-  'User-Agent':
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
 };
 
 function explainNonJsonBody(statusCode: number, raw: string): Error {
@@ -250,10 +239,7 @@ let cachedHttpsAgent: HttpsProxyAgent<string> | undefined;
 let cachedHttpAgent: HttpProxyAgent<string> | undefined;
 
 function supplierProxyAgent(url: URL): http.Agent | undefined {
-  const raw =
-    process.env.SUPPLIER_FETCH_PROXY?.trim() ||
-    process.env.HTTPS_PROXY?.trim() ||
-    process.env.HTTP_PROXY?.trim();
+  const raw = process.env.SUPPLIER_FETCH_PROXY?.trim() || process.env.HTTPS_PROXY?.trim() || process.env.HTTP_PROXY?.trim();
   if (!raw) return undefined;
   if (cachedProxyUrl !== raw) {
     cachedProxyUrl = raw;
@@ -278,12 +264,7 @@ type CatalogRequestOptions = {
   catalogRefererBase?: string;
 };
 
-function httpRequestJson<T>(
-  method: string,
-  urlStr: string,
-  body?: object,
-  opts?: CatalogRequestOptions,
-): Promise<HttpJsonResult<T>> {
+function httpRequestJson<T>(method: string, urlStr: string, body?: object, opts?: CatalogRequestOptions): Promise<HttpJsonResult<T>> {
   return new Promise((resolve, reject) => {
     const url = new URL(urlStr);
     const lib = url.protocol === 'https:' ? https : http;
@@ -353,14 +334,7 @@ function playwrightHeaded(): boolean {
   return envFlagTrue('SUPPLIER_FETCH_PLAYWRIGHT_HEADED');
 }
 
-const PLAYWRIGHT_CHANNELS = new Set([
-  'chromium',
-  'chrome',
-  'chrome-beta',
-  'msedge',
-  'msedge-beta',
-  'msedge-dev',
-]);
+const PLAYWRIGHT_CHANNELS = new Set(['chromium', 'chrome', 'chrome-beta', 'msedge', 'msedge-beta', 'msedge-dev']);
 
 function playwrightLaunchOptions(): { channel?: string; executablePath?: string } {
   const exe = process.env.SUPPLIER_FETCH_PLAYWRIGHT_EXECUTABLE?.trim();
@@ -371,10 +345,7 @@ function playwrightLaunchOptions(): { channel?: string; executablePath?: string 
 }
 
 function playwrightBrowserProxy(): { server: string } | undefined {
-  const raw =
-    process.env.SUPPLIER_FETCH_PROXY?.trim() ||
-    process.env.HTTPS_PROXY?.trim() ||
-    process.env.HTTP_PROXY?.trim();
+  const raw = process.env.SUPPLIER_FETCH_PROXY?.trim() || process.env.HTTPS_PROXY?.trim() || process.env.HTTP_PROXY?.trim();
   return raw ? { server: raw } : undefined;
 }
 
@@ -423,9 +394,7 @@ async function fetchCatalogViaPlaywright<T>(
   try {
     chromium = await getStealthChromium();
   } catch {
-    throw new Error(
-      'Playwright failed to load. Run: npm install playwright && npx playwright install chromium',
-    );
+    throw new Error('Playwright failed to load. Run: npm install playwright && npx playwright install chromium');
   }
 
   const proxy = playwrightBrowserProxy();
@@ -453,10 +422,7 @@ async function fetchCatalogViaPlaywright<T>(
 
     await page.goto(homeUrl, { waitUntil: 'networkidle', timeout: 120_000 });
 
-    const homeWaitMs = Math.min(
-      Math.max(0, Number(process.env.SUPPLIER_FETCH_PLAYWRIGHT_HOME_WAIT_MS ?? '2500') || 0),
-      60_000,
-    );
+    const homeWaitMs = Math.min(Math.max(0, Number(process.env.SUPPLIER_FETCH_PLAYWRIGHT_HOME_WAIT_MS ?? '2500') || 0), 60_000);
     if (homeWaitMs > 0) {
       await new Promise<void>(r => setTimeout(r, homeWaitMs));
     }
@@ -520,11 +486,7 @@ async function fetchCatalogViaPlaywright<T>(
 }
 
 /** Load Store API JSON array: HTTP first (unless Playwright forced), optional auto Playwright retry. */
-async function loadStoreApiArray<T>(
-  listUrl: string,
-  catalogOrigin: string,
-  parseArray: (raw: string) => T[] | null,
-): Promise<HttpJsonResult<T[]>> {
+async function loadStoreApiArray<T>(listUrl: string, catalogOrigin: string, parseArray: (raw: string) => T[] | null): Promise<HttpJsonResult<T[]>> {
   if (playwrightForced()) {
     return fetchCatalogViaPlaywright(listUrl, catalogOrigin, parseArray);
   }
@@ -542,44 +504,68 @@ async function loadStoreApiArray<T>(
   }
 }
 
-async function loadStoreApiProductList(
-  listUrl: string,
-  catalogOrigin: string,
-): Promise<HttpJsonResult<StoreApiProduct[]>> {
+async function loadStoreApiProductList(listUrl: string, catalogOrigin: string): Promise<HttpJsonResult<StoreApiProduct[]>> {
   return loadStoreApiArray(listUrl, catalogOrigin, parseProductArray);
 }
 
-/** Public: supplier catalog product categories (Store API v1). */
+/** Public: supplier catalog product categories (Store API). Tries v1 first, falls back to unversioned path. */
 export async function loadSupplierStoreProductCategories(catalogBaseUrl: string): Promise<StoreApiProductCategory[]> {
   const sourceBase = normalizeBaseUrl(catalogBaseUrl);
-  const listUrl = `${sourceBase}/wp-json/wc/store/v1/products/categories`;
 
-  let listRes: HttpJsonResult<StoreApiProductCategory[]>;
-  try {
-    listRes = await loadStoreApiArray(listUrl, sourceBase, parseProductCategoryArray);
-  } catch (e) {
-    throw new HttpException(502, `Failed to fetch Store API categories: ${(e as Error).message}`);
+  for (const apiPath of ['wc/store/v1', 'wc/store']) {
+    const listUrl = `${sourceBase}/wp-json/${apiPath}/products/categories`;
+    let listRes: HttpJsonResult<StoreApiProductCategory[]>;
+    try {
+      listRes = await loadStoreApiArray(listUrl, sourceBase, parseProductCategoryArray);
+    } catch (e) {
+      throw new HttpException(502, `Failed to fetch Store API categories: ${(e as Error).message}`);
+    }
+
+    if (listRes.status === 404) continue;
+
+    if (listRes.status >= 400) {
+      throw new HttpException(502, `Store API categories returned ${listRes.status}: ${listRes.raw.slice(0, 200)}`);
+    }
+    if (!Array.isArray(listRes.data)) {
+      throw new HttpException(502, 'Store API categories returned unexpected payload (expected array)');
+    }
+    return listRes.data;
   }
 
-  if (listRes.status >= 400) {
-    throw new HttpException(502, `Store API categories returned ${listRes.status}: ${listRes.raw.slice(0, 200)}`);
-  }
-  if (!Array.isArray(listRes.data)) {
-    throw new HttpException(502, 'Store API categories returned unexpected payload (expected array)');
-  }
-  return listRes.data;
+  throw new HttpException(502, 'Store API categories returned 404 on all known paths (wc/store/v1, wc/store)');
 }
 
 const STORE_API_CATEGORY_PER_PAGE = 100;
 const STORE_API_CATEGORY_MAX_PAGES = 100;
 
-/** Store API `products/categories`: all pages until empty or short page. */
+/** Store API `products/categories`: all pages until empty or short page. Tries v1 first, falls back to unversioned path. */
 export async function fetchAllSupplierStoreApiProductCategories(catalogBaseUrl: string): Promise<StoreApiProductCategory[]> {
   const sourceBase = normalizeBaseUrl(catalogBaseUrl);
+
+  let resolvedApiPath: string | null = null;
+
+  for (const apiPath of ['wc/store/v1', 'wc/store']) {
+    const probeUrl = `${sourceBase}/wp-json/${apiPath}/products/categories?page=1&per_page=1`;
+    let probeRes: HttpJsonResult<StoreApiProductCategory[]>;
+    try {
+      probeRes = await loadStoreApiArray(probeUrl, sourceBase, parseProductCategoryArray);
+    } catch (e) {
+      throw new HttpException(502, `Failed to fetch Store API categories: ${(e as Error).message}`);
+    }
+    if (probeRes.status !== 404) {
+      resolvedApiPath = apiPath;
+      break;
+    }
+  }
+
+  if (!resolvedApiPath) {
+    throw new HttpException(502, 'Store API categories returned 404 on all known paths (wc/store/v1, wc/store)');
+  }
+
   const all: StoreApiProductCategory[] = [];
 
   for (let page = 1; page <= STORE_API_CATEGORY_MAX_PAGES; page += 1) {
-    const listUrl = `${sourceBase}/wp-json/wc/store/v1/products/categories?page=${page}&per_page=${STORE_API_CATEGORY_PER_PAGE}`;
+    const listUrl = `${sourceBase}/wp-json/${resolvedApiPath}/products/categories?page=${page}&per_page=${STORE_API_CATEGORY_PER_PAGE}`;
     let listRes: HttpJsonResult<StoreApiProductCategory[]>;
     try {
       listRes = await loadStoreApiArray(listUrl, sourceBase, parseProductCategoryArray);
@@ -643,8 +629,7 @@ function wooErrorDetail(data: unknown, raw: string): string {
 }
 
 function wooHttpErrorDetail(err: unknown): string {
-  const nonAxiosMessage = (): string =>
-    err instanceof Error ? err.message : typeof err === 'string' ? err : String(err);
+  const nonAxiosMessage = (): string => (err instanceof Error ? err.message : typeof err === 'string' ? err : String(err));
 
   if (typeof err !== 'object' || err === null || !('response' in err)) {
     return nonAxiosMessage();
@@ -653,8 +638,7 @@ function wooHttpErrorDetail(err: unknown): string {
   if (!res || typeof res.status !== 'number') {
     return nonAxiosMessage();
   }
-  const raw =
-    typeof res.data === 'string' ? res.data : JSON.stringify(res.data ?? '').slice(0, 200);
+  const raw = typeof res.data === 'string' ? res.data : JSON.stringify(res.data ?? '').slice(0, 200);
   return `${res.status} ${wooErrorDetail(res.data, raw)}`;
 }
 
@@ -788,13 +772,7 @@ async function importStoreApiProductRows(
     const { sku } = supplierProductSkusFromStoreApi(p);
     try {
       const targetStoreCategoryId = getTargetStoreCategoryId(p);
-      const payload = await buildWooProductPayload(
-        p,
-        woo,
-        importTags,
-        targetStoreCategoryId,
-        catalog?.supplierId,
-      );
+      const payload = await buildWooProductPayload(p, woo, importTags, targetStoreCategoryId, catalog?.supplierId);
       const upsert = await upsertWooProduct(woo, sku, payload);
       if (catalog) {
         await persistCatalogAfterImport(catalog, p, upsert.id, payload);
@@ -869,10 +847,7 @@ export async function importPage(
     result.productsSeen += pageProducts.length;
 
     if (pageProducts.length > 0) {
-      const getTargetStoreCategoryId =
-        categoryOpts?.supplierCategoryId != null
-          ? () => categoryOpts.targetStoreCategoryId
-          : () => undefined;
+      const getTargetStoreCategoryId = categoryOpts?.supplierCategoryId != null ? () => categoryOpts.targetStoreCategoryId : () => undefined;
       const batch = await importStoreApiProductRows(pageProducts, woo, importTags, getTargetStoreCategoryId, catalog);
       result.created += batch.created;
       result.updated += batch.updated;
@@ -1017,9 +992,7 @@ async function buildWooProductPayload(
   }
 
   const sku = (p.sku && String(p.sku).trim()) || `import-${p.id}`;
-  const meta_data: { key: string; value: string }[] = [
-    { key: '_source_store_product_id', value: String(p.id) },
-  ];
+  const meta_data: { key: string; value: string }[] = [{ key: '_source_store_product_id', value: String(p.id) }];
   if (sourceSupplierId != null) {
     meta_data.push({ key: '_source_supplier_id', value: String(sourceSupplierId) });
   }
@@ -1041,12 +1014,7 @@ async function buildWooProductPayload(
   };
 }
 
-async function ensureProductTerm(
-  woo: WooRestClient,
-  kind: 'categories' | 'tags',
-  slug: string,
-  name: string,
-): Promise<number> {
+async function ensureProductTerm(woo: WooRestClient, kind: 'categories' | 'tags', slug: string, name: string): Promise<number> {
   const endpoint = kind === 'categories' ? 'products/categories' : 'products/tags';
   let existing: WooTerm[];
   try {
