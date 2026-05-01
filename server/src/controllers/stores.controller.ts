@@ -1,6 +1,7 @@
 import { NextFunction, Response } from 'express';
 import { ImportStoreProductsDto } from '@dtos/import-store-products.dto';
 import { SyncStoreRulesImportDto } from '@dtos/sync-store-rules-import.dto';
+import { SyncSingleRuleImportDto } from '@dtos/sync-single-rule-import.dto';
 import { CreateStoreDto } from '@dtos/stores.dto';
 import { RequestWithUser } from '@interfaces/auth.interface';
 import { Store, StoreProductCategory, StoreSummary, StoreWooProduct } from '@interfaces/stores.interface';
@@ -95,6 +96,17 @@ class StoresController {
       const storeId: string = req.params.id;
       const data: Store = await this.storeService.deleteStore(storeId, req.user.id);
       res.status(200).json({ data, message: 'deleted' });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public importSyncSingleRule = async (req: RequestWithUser, res: Response, next: NextFunction) => {
+    try {
+      const storeId: string = req.params.id;
+      const body: SyncSingleRuleImportDto = req.body;
+      const data = await this.storeService.importProductsSyncSingleRule(storeId, req.user.id, body);
+      res.status(200).json({ data, message: 'importSyncSingleRule' });
     } catch (error) {
       next(error);
     }

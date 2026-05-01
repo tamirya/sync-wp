@@ -99,6 +99,10 @@ export type AppMessages = {
   mappingSyncSuccess: string;
   mappingSyncFailed: string;
   mappingSyncNoRules: string;
+  mappingRuleSyncAria: string;
+  mappingRuleSyncing: string;
+  mappingRuleSyncSuccess: string;
+  mappingRuleSyncFailed: string;
   suppliersBreadcrumb: string;
   suppliersTitle: string;
   suppliersSubtitle: string;
@@ -278,6 +282,10 @@ const he: AppMessages = {
   mappingSyncSuccess: "הסנכרון הושלם בהצלחה",
   mappingSyncFailed: "הסנכרון נכשל",
   mappingSyncNoRules: "אין כללי מיפוי לסנכרון",
+  mappingRuleSyncAria: "סנכרן כלל זה",
+  mappingRuleSyncing: "מסנכרן…",
+  mappingRuleSyncSuccess: "סונכרן",
+  mappingRuleSyncFailed: "נכשל",
   suppliersBreadcrumb: "ספקים",
   suppliersTitle: "הספקים שלי",
   suppliersSubtitle: "ניהול ספקי קטלוג וחיבור לקטלוג המוצרים.",
@@ -459,6 +467,10 @@ const en: AppMessages = {
   mappingSyncSuccess: "Sync completed successfully",
   mappingSyncFailed: "Sync failed",
   mappingSyncNoRules: "No mapping rules to sync",
+  mappingRuleSyncAria: "Sync this rule",
+  mappingRuleSyncing: "Syncing…",
+  mappingRuleSyncSuccess: "Synced",
+  mappingRuleSyncFailed: "Failed",
   suppliersBreadcrumb: "SUPPLIERS",
   suppliersTitle: "My suppliers",
   suppliersSubtitle: "Manage supplier catalogs and product feeds.",

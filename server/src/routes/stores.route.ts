@@ -3,6 +3,7 @@ import StoresController from '@controllers/stores.controller';
 import { ClearStoreWooProductsDto } from '@dtos/clear-store-woo-products.dto';
 import { ImportStoreProductsDto } from '@dtos/import-store-products.dto';
 import { SyncStoreRulesImportDto } from '@dtos/sync-store-rules-import.dto';
+import { SyncSingleRuleImportDto } from '@dtos/sync-single-rule-import.dto';
 import { CreateStoreDto } from '@dtos/stores.dto';
 import { Routes } from '@interfaces/routes.interface';
 import authMiddleware from '@middlewares/auth.middleware';
@@ -40,6 +41,12 @@ class StoresRoute implements Routes {
       authMiddleware,
       validationMiddleware(SyncStoreRulesImportDto, 'body', true),
       this.storesController.importSyncRules,
+    );
+    this.router.post(
+      `${this.path}/:id/import/sync-rule`,
+      authMiddleware,
+      validationMiddleware(SyncSingleRuleImportDto, 'body', true),
+      this.storesController.importSyncSingleRule,
     );
     this.router.post(
       `${this.path}/:id/import/store-api`,

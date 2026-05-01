@@ -28,6 +28,8 @@ type Props = {
   onDeleteProductRule?: (id: number) => void;
   onToggleCategoryRule?: (id: number, enabled: boolean) => Promise<unknown>;
   onToggleProductRule?: (id: number, enabled: boolean) => Promise<unknown>;
+  onSyncCategoryRule?: (id: number) => Promise<void>;
+  onSyncProductRule?: (id: number) => Promise<void>;
   onAddCategoryRule?: () => void;
   onAddProductRule?: () => void;
 };
@@ -83,7 +85,12 @@ function SectionHeader({
           onClick={onAdd}
           className="ms-auto flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 active:scale-95"
         >
-          <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0" aria-hidden>
+          <svg
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className="h-4 w-4 shrink-0"
+            aria-hidden
+          >
             <path d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" />
           </svg>
           {addLabel}
@@ -153,7 +160,12 @@ function DeleteButton({
           <path d="M21 12a9 9 0 1 1-6.219-8.56" />
         </svg>
       ) : (
-        <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 shrink-0" aria-hidden>
+        <svg
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          className="h-3.5 w-3.5 shrink-0"
+          aria-hidden
+        >
           <path
             fillRule="evenodd"
             d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
@@ -162,6 +174,121 @@ function DeleteButton({
         </svg>
       )}
       {removeLabel}
+    </button>
+  );
+}
+
+type SyncStatus = "idle" | "pending" | "success" | "error";
+
+function SyncButton({
+  onClick,
+  label,
+  syncingLabel,
+  successLabel,
+  failedLabel,
+}: {
+  onClick: () => void;
+  label: string;
+  syncingLabel: string;
+  successLabel: string;
+  failedLabel: string;
+}) {
+  const [status, setStatus] = useState<SyncStatus>("idle");
+
+  async function handleClick() {
+    if (status === "pending") return;
+    setStatus("pending");
+    try {
+      await onClick();
+      setStatus("success");
+      setTimeout(() => setStatus("idle"), 3000);
+    } catch {
+      setStatus("error");
+      setTimeout(() => setStatus("idle"), 3000);
+    }
+  }
+
+  const isSuccess = status === "success";
+  const isError = status === "error";
+  const isPending = status === "pending";
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={isPending}
+      aria-label={label}
+      className={`flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-semibold shadow-sm transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
+        isSuccess
+          ? "bg-emerald-500 text-white"
+          : isError
+            ? "bg-destructive text-white"
+            : "bg-primary/10 text-primary hover:bg-primary/20"
+      }`}
+    >
+      {isPending ? (
+        <>
+          <svg
+            className="h-3.5 w-3.5 animate-spin"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden
+          >
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          </svg>
+          {syncingLabel}
+        </>
+      ) : isSuccess ? (
+        <>
+          <svg
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className="h-3.5 w-3.5 shrink-0"
+            aria-hidden
+          >
+            <path
+              fillRule="evenodd"
+              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+              clipRule="evenodd"
+            />
+          </svg>
+          {successLabel}
+        </>
+      ) : isError ? (
+        <>
+          <svg
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className="h-3.5 w-3.5 shrink-0"
+            aria-hidden
+          >
+            <path
+              fillRule="evenodd"
+              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+              clipRule="evenodd"
+            />
+          </svg>
+          {failedLabel}
+        </>
+      ) : (
+        <>
+          <svg
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className="h-3.5 w-3.5 shrink-0"
+            aria-hidden
+          >
+            <path
+              fillRule="evenodd"
+              d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+              clipRule="evenodd"
+            />
+          </svg>
+          {label}
+        </>
+      )}
     </button>
   );
 }
@@ -180,6 +307,7 @@ function CategoryRuleRow({
   messages,
   onDelete,
   onToggle,
+  onSync,
 }: {
   rule: MappingRule;
   storeName: string;
@@ -190,6 +318,7 @@ function CategoryRuleRow({
   messages: AppMessages;
   onDelete?: (id: number) => void;
   onToggle?: (id: number, enabled: boolean) => Promise<unknown>;
+  onSync?: (id: number) => Promise<void>;
 }) {
   const [deletePending, startDeleteTransition] = useTransition();
   const [togglePending, startToggleTransition] = useTransition();
@@ -198,7 +327,9 @@ function CategoryRuleRow({
 
   function handleDelete() {
     if (!onDelete) return;
-    startDeleteTransition(() => { onDelete(rule.id); });
+    startDeleteTransition(() => {
+      onDelete(rule.id);
+    });
   }
 
   function handleToggle(val: boolean) {
@@ -210,7 +341,11 @@ function CategoryRuleRow({
 
   return (
     <li className="flex flex-wrap items-center gap-3 px-4 py-3.5 hover:bg-muted-bg/40">
-      <ToggleSwitch checked={enabled} onChange={handleToggle} isPending={togglePending} />
+      <ToggleSwitch
+        checked={enabled}
+        onChange={handleToggle}
+        isPending={togglePending}
+      />
 
       {/* Supplier side */}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -225,9 +360,7 @@ function CategoryRuleRow({
             </span>
           )}
         </span>
-        {range && (
-          <span className="text-[11px] text-muted">{range}</span>
-        )}
+        {range && <span className="text-[11px] text-muted">{range}</span>}
       </div>
 
       <svg
@@ -251,16 +384,25 @@ function CategoryRuleRow({
         </span>
       </div>
 
-      {onDelete && (
-        <div className="flex shrink-0 items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-1.5">
+        {onSync && (
+          <SyncButton
+            onClick={() => onSync(rule.id)}
+            label={messages.mappingRuleSyncAria}
+            syncingLabel={messages.mappingRuleSyncing}
+            successLabel={messages.mappingRuleSyncSuccess}
+            failedLabel={messages.mappingRuleSyncFailed}
+          />
+        )}
+        {onDelete && (
           <DeleteButton
             onClick={handleDelete}
             label={messages.mappingRuleDeleteAria}
             removeLabel={messages.mappingRuleRemoveLabel}
             isPending={deletePending}
           />
-        </div>
-      )}
+        )}
+      </div>
     </li>
   );
 }
@@ -278,6 +420,7 @@ function ProductRuleRow({
   messages,
   onDelete,
   onToggle,
+  onSync,
 }: {
   rule: ProductMappingRule;
   storeName: string;
@@ -287,6 +430,7 @@ function ProductRuleRow({
   messages: AppMessages;
   onDelete?: (id: number) => void;
   onToggle?: (id: number, enabled: boolean) => Promise<unknown>;
+  onSync?: (id: number) => Promise<void>;
 }) {
   const [deletePending, startDeleteTransition] = useTransition();
   const [togglePending, startToggleTransition] = useTransition();
@@ -298,7 +442,9 @@ function ProductRuleRow({
 
   function handleDelete() {
     if (!onDelete) return;
-    startDeleteTransition(() => { onDelete(rule.id); });
+    startDeleteTransition(() => {
+      onDelete(rule.id);
+    });
   }
 
   function handleToggle(val: boolean) {
@@ -310,7 +456,11 @@ function ProductRuleRow({
 
   return (
     <li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-4 hover:bg-muted-bg/40">
-      <ToggleSwitch checked={enabled} onChange={handleToggle} isPending={togglePending} />
+      <ToggleSwitch
+        checked={enabled}
+        onChange={handleToggle}
+        isPending={togglePending}
+      />
 
       {/* Supplier side */}
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -345,9 +495,7 @@ function ProductRuleRow({
               {messages.mappingProductPrice}: {price}
             </span>
           )}
-          {range && (
-            <span className="text-[11px] text-muted">{range}</span>
-          )}
+          {range && <span className="text-[11px] text-muted">{range}</span>}
         </div>
       </div>
 
@@ -386,16 +534,25 @@ function ProductRuleRow({
         </div>
       </div>
 
-      {onDelete && (
-        <div className="flex shrink-0 items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-1.5">
+        {onSync && (
+          <SyncButton
+            onClick={() => onSync(rule.id)}
+            label={messages.mappingRuleSyncAria}
+            syncingLabel={messages.mappingRuleSyncing}
+            successLabel={messages.mappingRuleSyncSuccess}
+            failedLabel={messages.mappingRuleSyncFailed}
+          />
+        )}
+        {onDelete && (
           <DeleteButton
             onClick={handleDelete}
             label={messages.mappingRuleDeleteAria}
             removeLabel={messages.mappingRuleRemoveLabel}
             isPending={deletePending}
           />
-        </div>
-      )}
+        )}
+      </div>
     </li>
   );
 }
@@ -420,6 +577,8 @@ export function MappingRulesList({
   onDeleteProductRule,
   onToggleCategoryRule,
   onToggleProductRule,
+  onSyncCategoryRule,
+  onSyncProductRule,
   onAddCategoryRule,
   onAddProductRule,
 }: Props) {
@@ -458,17 +617,20 @@ export function MappingRulesList({
                   storeName={resolveName(storeMap, rule.storeId)}
                   supplierName={resolveName(supplierMap, rule.supplierId)}
                   supplierCategoryName={
-                    supplierCategoryMap[rule.supplierCategoryId] ?? `#${rule.supplierCategoryId}`
+                    supplierCategoryMap[rule.supplierCategoryId] ??
+                    `#${rule.supplierCategoryId}`
                   }
                   supplierCategoryCount={
                     supplierCategoryCountMap[rule.supplierCategoryId] ?? null
                   }
                   storeCategoryName={
-                    storeCategoryMap[rule.storeCategoryId] ?? `#${rule.storeCategoryId}`
+                    storeCategoryMap[rule.storeCategoryId] ??
+                    `#${rule.storeCategoryId}`
                   }
                   messages={messages}
                   onDelete={onDeleteCategoryRule}
                   onToggle={onToggleCategoryRule}
+                  onSync={onSyncCategoryRule}
                 />
               ))}
             </ul>
@@ -504,11 +666,13 @@ export function MappingRulesList({
                   supplierName={resolveName(supplierMap, rule.supplierId)}
                   product={supplierProductMap[rule.sourceProductId] ?? null}
                   storeCategoryName={
-                    storeCategoryMap[rule.storeCategoryId] ?? `#${rule.storeCategoryId}`
+                    storeCategoryMap[rule.storeCategoryId] ??
+                    `#${rule.storeCategoryId}`
                   }
                   messages={messages}
                   onDelete={onDeleteProductRule}
                   onToggle={onToggleProductRule}
+                  onSync={onSyncProductRule}
                 />
               ))}
             </ul>

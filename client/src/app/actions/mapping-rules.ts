@@ -29,6 +29,35 @@ export async function syncMappingRulesAction(
   }
 }
 
+export async function syncSingleMappingRuleAction(
+  locale: string,
+  storeId: number,
+  ruleId: number,
+  type: "category" | "product",
+): Promise<MappingActionResult> {
+  try {
+    const body =
+      type === "category"
+        ? { categoryRuleId: ruleId }
+        : { productCategoryRuleId: ruleId };
+
+    const res = await backendFetch(`/stores/${storeId}/import/sync-rule`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      return { ok: false, error: await readApiError(res) };
+    }
+    revalidatePath(`/${locale}/mapping`);
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 async function readApiError(res: Response): Promise<string> {
   const t = await res.text().catch(() => "");
   try {

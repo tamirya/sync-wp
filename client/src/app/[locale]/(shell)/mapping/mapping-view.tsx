@@ -12,6 +12,7 @@ import { useTransition } from "react";
 import {
   deleteCategoryRuleAction,
   deleteProductRuleAction,
+  syncSingleMappingRuleAction,
   updateCategoryRuleEnabledAction,
   updateProductRuleEnabledAction,
 } from "@/app/actions/mapping-rules";
@@ -65,6 +66,30 @@ export function MappingView({
     });
   }
 
+  async function handleSyncCategoryRule(id: number) {
+    const rule = mappingRules.find((r) => r.id === id);
+    if (!rule) return;
+    const result = await syncSingleMappingRuleAction(
+      locale,
+      rule.storeId,
+      id,
+      "category",
+    );
+    if (!result.ok) throw new Error(result.error);
+  }
+
+  async function handleSyncProductRule(id: number) {
+    const rule = productMappingRules.find((r) => r.id === id);
+    if (!rule) return;
+    const result = await syncSingleMappingRuleAction(
+      locale,
+      rule.storeId,
+      id,
+      "product",
+    );
+    if (!result.ok) throw new Error(result.error);
+  }
+
   return (
     <div className="space-y-6">
       <MappingRulesList
@@ -88,6 +113,8 @@ export function MappingView({
         onToggleProductRule={(id, enabled) =>
           updateProductRuleEnabledAction(locale, id, enabled)
         }
+        onSyncCategoryRule={handleSyncCategoryRule}
+        onSyncProductRule={handleSyncProductRule}
         onAddCategoryRule={() =>
           router.push(`/${locale}/mapping/new?type=category`)
         }

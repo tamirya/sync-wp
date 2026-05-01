@@ -2,6 +2,7 @@ import WooCommerceRestApi from '@woocommerce/woocommerce-rest-api';
 import { col, fn, Op } from 'sequelize';
 import { ImportStoreProductsDto } from '@dtos/import-store-products.dto';
 import { SyncStoreRulesImportDto } from '@dtos/sync-store-rules-import.dto';
+import { SyncSingleRuleImportDto } from '@dtos/sync-single-rule-import.dto';
 import { CreateStoreDto } from '@dtos/stores.dto';
 import { HttpException } from '@exceptions/HttpException';
 import { Store, StoreProductCategory, StoreSummary, StoreWooProduct } from '@interfaces/stores.interface';
@@ -112,22 +113,14 @@ class StoreService {
     };
 
     const productAgg = (await StoreCatalogModel.findAll({
-      attributes: [
-        'storeId',
-        [fn('COUNT', col('id')), 'productCount'],
-        [fn('MAX', col('updatedAt')), 'lastProductAt'],
-      ],
+      attributes: ['storeId', [fn('COUNT', col('id')), 'productCount'], [fn('MAX', col('updatedAt')), 'lastProductAt']],
       where: { storeId: { [Op.in]: storeIds } },
       group: ['storeId'],
       raw: true,
     })) as unknown as ProductAgg[];
 
     const categoryAgg = (await StoreCategoryModel.findAll({
-      attributes: [
-        'storeId',
-        [fn('COUNT', col('id')), 'categoryCount'],
-        [fn('MAX', col('updatedAt')), 'lastCategoryAt'],
-      ],
+      attributes: ['storeId', [fn('COUNT', col('id')), 'categoryCount'], [fn('MAX', col('updatedAt')), 'lastCategoryAt']],
       where: { storeId: { [Op.in]: storeIds } },
       group: ['storeId'],
       raw: true,
@@ -200,10 +193,7 @@ class StoreService {
     });
   }
 
-  public async syncStoreCategories(
-    storeId: string,
-    userId: number,
-  ): Promise<{ fetched: number; upserted: number; removed: number }> {
+  public async syncStoreCategories(storeId: string, userId: number): Promise<{ fetched: number; upserted: number; removed: number }> {
     await this.findStoreById(storeId, userId);
     const id = Number(storeId);
     if (Number.isNaN(id)) throw new HttpException(400, 'StoreId is invalid');
@@ -221,12 +211,7 @@ class StoreService {
       if (!Number.isFinite(wooCategoryId)) continue;
       fetchedWooCategoryIds.push(wooCategoryId);
       const parentRaw = row.parent;
-      const parent =
-        typeof parentRaw === 'number'
-          ? parentRaw
-          : parentRaw != null && String(parentRaw).length > 0
-            ? Number(parentRaw)
-            : null;
+      const parent = typeof parentRaw === 'number' ? parentRaw : parentRaw != null && String(parentRaw).length > 0 ? Number(parentRaw) : null;
       const count = row.count != null && typeof row.count === 'number' ? row.count : null;
 
       await StoreCategoryModel.upsert({
@@ -356,9 +341,7 @@ class StoreService {
     return rows.map(r => {
       const plain = r.get({ plain: true });
       const base =
-        plain.payload && typeof plain.payload === 'object' && !Array.isArray(plain.payload)
-          ? { ...(plain.payload as Record<string, unknown>) }
-          : {};
+        plain.payload && typeof plain.payload === 'object' && !Array.isArray(plain.payload) ? { ...(plain.payload as Record<string, unknown>) } : {};
       return { ...base, id: plain.wooProductId } as StoreWooProduct;
     });
   }
@@ -419,10 +402,7 @@ class StoreService {
     }
   }
 
-  public async syncStoreCatalog(
-    storeId: string,
-    userId: number,
-  ): Promise<{ fetched: number; upserted: number; removed: number }> {
+  public async syncStoreCatalog(storeId: string, userId: number): Promise<{ fetched: number; upserted: number; removed: number }> {
     await this.findStoreById(storeId, userId);
     const id = Number(storeId);
     if (Number.isNaN(id)) throw new HttpException(400, 'StoreId is invalid');
@@ -433,9 +413,7 @@ class StoreService {
       return { fetched: 0, upserted: 0, removed };
     }
 
-    const validSupplierIds = new Set(
-      (await SupplierModel.findAll({ attributes: ['id'], where: { userId } })).map(s => s.id),
-    );
+    const validSupplierIds = new Set((await SupplierModel.findAll({ attributes: ['id'], where: { userId } })).map(s => s.id));
 
     const fetchedWooIds: number[] = [];
     let upserted = 0;
@@ -447,13 +425,10 @@ class StoreService {
       const name = typeof row.name === 'string' ? row.name : null;
       const sourceProductId = readWooMetaUInt(row.meta_data, '_source_store_product_id');
       const metaSupplierId = readWooMetaUInt(row.meta_data, '_source_supplier_id');
-      const sourceSupplierId =
-        metaSupplierId != null && validSupplierIds.has(metaSupplierId) ? metaSupplierId : null;
+      const sourceSupplierId = metaSupplierId != null && validSupplierIds.has(metaSupplierId) ? metaSupplierId : null;
 
       const rawCategories = row.categories;
-      const categories = Array.isArray(rawCategories)
-        ? (rawCategories as { id: number }[]).map(c => String(c.id))
-        : null;
+      const categories = Array.isArray(rawCategories) ? (rawCategories as { id: number }[]).map(c => String(c.id)) : null;
 
       await StoreCatalogModel.upsert({
         storeId: id,
@@ -528,11 +503,7 @@ class StoreService {
     return plain;
   }
 
-  public async importProductsFromStoreApi(
-    storeId: string,
-    userId: number,
-    dto: ImportStoreProductsDto,
-  ): Promise<StoreApiImportResult> {
+  public async importProductsFromStoreApi(storeId: string, userId: number, dto: ImportStoreProductsDto): Promise<StoreApiImportResult> {
     const store = await this.findStoreById(storeId, userId);
     let supplierId = dto.supplierId;
     let categoryOpts: ImportPageCategoryOptions | undefined;
@@ -563,15 +534,24 @@ class StoreService {
     const supplier = await this.supplierService.findSupplierById(String(supplierId), userId);
     const sourceUrl = supplier.url && String(supplier.url).trim();
     if (!sourceUrl) {
-      throw new HttpException(400, "Supplier has no url; set the supplier catalog base URL");
+      throw new HttpException(400, 'Supplier has no url; set the supplier catalog base URL');
     }
     const env = await this.envToStoreService.findEnvToStoreByStoreId(storeId, userId);
     const sid = Number(storeId);
     if (Number.isNaN(sid)) throw new HttpException(400, 'StoreId is invalid');
-    return importPage(store.url, sourceUrl, env.consumerKey, env.consumerSecret, dto, categoryOpts, {
-      storeId: sid,
-      supplierId,
-    }, store.port);
+    return importPage(
+      store.url,
+      sourceUrl,
+      env.consumerKey,
+      env.consumerSecret,
+      dto,
+      categoryOpts,
+      {
+        storeId: sid,
+        supplierId,
+      },
+      store.port,
+    );
   }
 
   /**
@@ -581,11 +561,7 @@ class StoreService {
    * If there are no product rules but there are `category_rules`, only rows whose Store API payload
    * `categories` include at least one rule `supplierCategoryId` are imported (same idea as live import).
    */
-  public async importProductsSyncAllRules(
-    storeId: string,
-    userId: number,
-    dto: SyncStoreRulesImportDto,
-  ): Promise<StoreRulesSyncImportResult> {
+  public async importProductsSyncAllRules(storeId: string, userId: number, dto: SyncStoreRulesImportDto): Promise<StoreRulesSyncImportResult> {
     const store = await this.findStoreById(storeId, userId);
     const sid = Number(storeId);
     if (Number.isNaN(sid)) throw new HttpException(400, 'StoreId is invalid');
@@ -738,6 +714,112 @@ class StoreService {
     }
 
     return { storeId: sid, bySupplier };
+  }
+
+  /**
+   * Import from `supplier_catalog` for exactly one category or product rule.
+   * Provide either `categoryRuleId` or `productCategoryRuleId` in the dto.
+   */
+  public async importProductsSyncSingleRule(storeId: string, userId: number, dto: SyncSingleRuleImportDto): Promise<StoreApiImportResult> {
+    if (dto.categoryRuleId == null && dto.productCategoryRuleId == null) {
+      throw new HttpException(400, 'Provide either categoryRuleId or productCategoryRuleId');
+    }
+    if (dto.categoryRuleId != null && dto.productCategoryRuleId != null) {
+      throw new HttpException(400, 'Provide only one of categoryRuleId or productCategoryRuleId, not both');
+    }
+
+    const store = await this.findStoreById(storeId, userId);
+    const sid = Number(storeId);
+    const env = await this.envToStoreService.findEnvToStoreByStoreId(storeId, userId);
+    const importDto: ImportStoreProductsDto = { importTags: dto.importTags ?? false };
+
+    if (dto.productCategoryRuleId != null) {
+      const rule = await ProductCategoryRuleModel.findOne({
+        where: { id: dto.productCategoryRuleId, userId, storeId: sid },
+      });
+      if (!rule) throw new HttpException(404, 'Product rule not found');
+      if (!rule.enabled) throw new HttpException(400, 'Product rule is disabled');
+
+      const catalogRow = await SupplierCatalogModel.findOne({
+        where: { supplierId: rule.supplierId, sourceProductId: rule.sourceProductId },
+      });
+      if (!catalogRow) {
+        throw new HttpException(404, 'No supplier_catalog row for this product rule; run POST /suppliers/:id/catalog/sync');
+      }
+
+      const plain = catalogRow.get({ plain: true });
+      const product = storeApiProductFromSupplierCatalogRow({
+        sourceProductId: plain.sourceProductId,
+        name: plain.name,
+        sku: plain.sku,
+        payload: plain.payload,
+      });
+
+      const resolution: ImportRuleResolution = {
+        productToStoreCategory: new Map([[rule.sourceProductId, rule.storeCategoryId]]),
+        categoryRulesOrdered: [],
+      };
+
+      return importFromSupplierCatalogWithRuleResolution(
+        store.url,
+        env.consumerKey,
+        env.consumerSecret,
+        [product],
+        importDto,
+        resolution,
+        { storeId: sid, supplierId: rule.supplierId },
+        store.port,
+      );
+    }
+
+    // categoryRuleId path
+    const rule = await CategoryRuleModel.findOne({
+      where: { id: dto.categoryRuleId, userId, storeId: sid },
+    });
+    if (!rule) throw new HttpException(404, 'Category rule not found');
+    if (!rule.enabled) throw new HttpException(400, 'Category rule is disabled');
+
+    let catalogRows = await SupplierCatalogModel.findAll({
+      where: { supplierId: rule.supplierId },
+      order: [['sourceProductId', 'ASC']],
+    });
+
+    const targetCategoryId = rule.supplierCategoryId;
+    catalogRows = catalogRows.filter(row => {
+      const plain = row.get({ plain: true }) as { sourceProductId: number; name: string | null; sku: string; payload: object | null };
+      const p = storeApiProductFromSupplierCatalogRow(plain);
+      return (p.categories || []).some(c => c.id === targetCategoryId);
+    });
+
+    if (catalogRows.length === 0) {
+      throw new HttpException(404, 'No supplier_catalog rows match this category rule; run POST /suppliers/:id/catalog/sync');
+    }
+
+    const resolution: ImportRuleResolution = {
+      productToStoreCategory: new Map(),
+      categoryRulesOrdered: [{ supplierCategoryId: rule.supplierCategoryId, storeCategoryId: rule.storeCategoryId }],
+    };
+
+    const products = catalogRows.map(r => {
+      const plain = r.get({ plain: true });
+      return storeApiProductFromSupplierCatalogRow({
+        sourceProductId: plain.sourceProductId,
+        name: plain.name,
+        sku: plain.sku,
+        payload: plain.payload,
+      });
+    });
+
+    return importFromSupplierCatalogWithRuleResolution(
+      store.url,
+      env.consumerKey,
+      env.consumerSecret,
+      products,
+      importDto,
+      resolution,
+      { storeId: sid, supplierId: rule.supplierId },
+      store.port,
+    );
   }
 }
 
