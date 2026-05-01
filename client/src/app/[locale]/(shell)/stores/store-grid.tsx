@@ -219,15 +219,26 @@ function StoreCardItem({
             </span>
           )}
 
-          {/* Store initials — centered */}
+          {/* Store initials or logo — centered */}
           <Link
             href={`/${locale}/stores/${store.id}`}
             className="absolute inset-0 flex items-center justify-center"
             tabIndex={-1}
             aria-hidden
           >
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 text-xl font-bold text-white shadow-md backdrop-blur-sm ring-2 ring-white/30">
-              {store.name.slice(0, 2).toUpperCase()}
+            <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl shadow-md ring-2 ring-white/30">
+              {store.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={store.logoUrl}
+                  alt={store.name}
+                  className="h-full w-full object-contain bg-white"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-white/20 text-xl font-bold text-white backdrop-blur-sm">
+                  {store.name.slice(0, 2).toUpperCase()}
+                </div>
+              )}
             </div>
           </Link>
 

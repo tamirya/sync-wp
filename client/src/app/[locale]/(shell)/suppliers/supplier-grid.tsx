@@ -199,11 +199,19 @@ function SupplierCardItem({
               href={`/${locale}/suppliers/${supplier.id}`}
               className="flex min-w-0 items-center gap-3 rounded-xl p-1 -m-1 transition hover:bg-muted-bg/60"
             >
-              <div
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400 via-cyan-500 to-teal-600 text-base font-bold text-white shadow-sm ring-2 ring-white/40"
-                aria-hidden
-              >
-                {supplier.name.slice(0, 2).toUpperCase()}
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl shadow-sm ring-2 ring-white/40">
+                {supplier.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={supplier.logoUrl}
+                    alt={supplier.name}
+                    className="h-full w-full object-contain bg-white"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-sky-400 via-cyan-500 to-teal-600 text-base font-bold text-white">
+                    {supplier.name.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
               </div>
               <div className="min-w-0">
                 <h2 className="truncate text-lg font-bold text-card-foreground group-hover:text-primary transition-colors">

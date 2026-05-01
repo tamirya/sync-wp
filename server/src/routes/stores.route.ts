@@ -20,6 +20,7 @@ class StoresRoute implements Routes {
 
   private initializeRoutes() {
     this.router.get(`${this.path}`, authMiddleware, this.storesController.getStores);
+    this.router.get(`${this.path}/:id/logo`, authMiddleware, this.storesController.getStoreLogo);
     this.router.get(`${this.path}/:id/categories`, authMiddleware, this.storesController.getStoreCategories);
     this.router.post(`${this.path}/:id/categories/sync`, authMiddleware, this.storesController.syncStoreCategories);
     this.router.post(

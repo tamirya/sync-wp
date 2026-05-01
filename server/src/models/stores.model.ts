@@ -9,9 +9,10 @@ export interface StoreAttributes {
   /** WooCommerce site base URL to import *into* (wc/v3 target). */
   url: string;
   port: number | null;
+  logoUrl: string | null;
 }
 
-export type StoreCreationAttributes = Optional<StoreAttributes, 'id' | 'port'>;
+export type StoreCreationAttributes = Optional<StoreAttributes, 'id' | 'port' | 'logoUrl'>;
 
 class StoreModel extends Model<StoreAttributes, StoreCreationAttributes> implements StoreAttributes {
   public id!: number;
@@ -19,6 +20,7 @@ class StoreModel extends Model<StoreAttributes, StoreCreationAttributes> impleme
   public name!: string;
   public url!: string;
   public port!: number | null;
+  public logoUrl!: string | null;
 }
 
 StoreModel.init(
@@ -48,6 +50,10 @@ StoreModel.init(
     },
     port: {
       type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+    },
+    logoUrl: {
+      type: DataTypes.STRING(2048),
       allowNull: true,
     },
   },

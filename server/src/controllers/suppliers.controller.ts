@@ -77,6 +77,16 @@ class SuppliersController {
     }
   };
 
+  public getSupplierLogo = async (req: RequestWithUser, res: Response, next: NextFunction) => {
+    try {
+      const supplierId: string = req.params.id;
+      const data = await this.supplierService.getSupplierLogo(supplierId, req.user.id);
+      res.status(200).json({ data, message: 'supplierLogo' });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   public createSupplier = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
       const supplierData: CreateSupplierDto = req.body;

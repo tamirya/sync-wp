@@ -1,4 +1,5 @@
 import WooCommerceRestApi from '@woocommerce/woocommerce-rest-api';
+import nodeFetch from 'node-fetch';
 import { col, fn, Op } from 'sequelize';
 import { ImportStoreProductsDto } from '@dtos/import-store-products.dto';
 import { SyncStoreRulesImportDto } from '@dtos/sync-store-rules-import.dto';
@@ -158,6 +159,7 @@ class StoreService {
         name: s.name,
         url: s.url,
         port: s.port,
+        logoUrl: s.logoUrl ?? null,
         productCount,
         categoryCount,
         lastSyncedAt,
@@ -402,8 +404,38 @@ class StoreService {
     }
   }
 
+  private async fetchLogoFromHomepage(baseUrl: string): Promise<string | null> {
+    const base = normalizeStoreBaseUrl(baseUrl);
+    let html: string;
+    try {
+      const res = await nodeFetch(base, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+      if (!res.ok) return null;
+      html = await res.text();
+    } catch {
+      return null;
+    }
+
+    // 1. <img class="custom-logo" src="...">  (WooCommerce / most WP themes)
+    const logoMatch =
+      html.match(/<img[^>]+class="[^"]*custom-logo[^"]*"[^>]+src="([^"]+)"/i) ??
+      html.match(/<img[^>]+src="([^"]+)"[^>]+class="[^"]*custom-logo[^"]*"/i);
+
+    // 2. <meta property="og:image" content="...">
+    const ogMatch =
+      html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i) ?? html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
+
+    // 3. <link rel="icon" href="..."> (favicon fallback)
+    const iconMatch =
+      html.match(/<link[^>]+rel="(?:shortcut )?icon"[^>]+href="([^"]+)"/i) ?? html.match(/<link[^>]+href="([^"]+)"[^>]+rel="(?:shortcut )?icon"/i);
+
+    const rawUrl = logoMatch?.[1] ?? ogMatch?.[1] ?? iconMatch?.[1] ?? null;
+    if (!rawUrl) return null;
+
+    return rawUrl.startsWith('http') ? rawUrl : `${base}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
+  }
+
   public async syncStoreCatalog(storeId: string, userId: number): Promise<{ fetched: number; upserted: number; removed: number }> {
-    await this.findStoreById(storeId, userId);
+    const store = await this.findStoreById(storeId, userId);
     const id = Number(storeId);
     if (Number.isNaN(id)) throw new HttpException(400, 'StoreId is invalid');
 
@@ -450,7 +482,21 @@ class StoreService {
       },
     });
 
+    const logoUrl = await this.fetchLogoFromHomepage(store.url);
+    if (logoUrl !== null) {
+      await StoreModel.update({ logoUrl }, { where: { id } });
+    }
+
     return { fetched: products.length, upserted, removed };
+  }
+
+  public async getStoreLogo(storeId: string, userId: number): Promise<{ logoUrl: string | null }> {
+    const store = await this.findStoreById(storeId, userId);
+    const logoUrl = await this.fetchLogoFromHomepage(store.url);
+    if (logoUrl !== null) {
+      await StoreModel.update({ logoUrl }, { where: { id: store.id } });
+    }
+    return { logoUrl };
   }
 
   public async findStoreById(storeId: string, userId: number): Promise<Store> {

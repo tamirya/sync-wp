@@ -53,6 +53,17 @@ async function fetchSupplierFull(
   }
 }
 
+async function fetchSupplierLogo(id: string): Promise<string | null> {
+  try {
+    const res = await backendFetch(`/suppliers/${id}/logo`);
+    if (!res.ok) return null;
+    const json = (await res.json()) as { data?: { logoUrl?: string | null } };
+    return json.data?.logoUrl ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Page                                                                */
 /* ------------------------------------------------------------------ */
@@ -64,7 +75,10 @@ export default async function SupplierCategoriesPage({ params }: Props) {
   const locale = raw as Locale;
   const messages = getAppMessages(locale);
 
-  const fullResult = await fetchSupplierFull(id);
+  const [fullResult, logoUrl] = await Promise.all([
+    fetchSupplierFull(id),
+    fetchSupplierLogo(id),
+  ]);
 
   if (!fullResult.ok) {
     if (fullResult.status === 401) {
@@ -201,11 +215,19 @@ export default async function SupplierCategoriesPage({ params }: Props) {
 
       {/* Header */}
       <div className="mt-6 flex flex-wrap items-start gap-4">
-        <div
-          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400 via-cyan-500 to-teal-600 text-base font-bold text-white shadow-sm ring-2 ring-white/40"
-          aria-hidden
-        >
-          {supplier.name.slice(0, 2).toUpperCase()}
+        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl shadow-sm ring-2 ring-white/40">
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoUrl}
+              alt={supplier.name}
+              className="h-full w-full object-contain"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-sky-400 via-cyan-500 to-teal-600 text-base font-bold text-white">
+              {supplier.name.slice(0, 2).toUpperCase()}
+            </div>
+          )}
         </div>
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">

@@ -1,3 +1,4 @@
+import nodeFetch from 'node-fetch';
 import { CreateSupplierDto } from '@dtos/suppliers.dto';
 import { HttpException } from '@exceptions/HttpException';
 import { col, fn, Op } from 'sequelize';
@@ -228,6 +229,33 @@ class SupplierService {
     });
   }
 
+  private async fetchLogoFromHomepage(baseUrl: string): Promise<string | null> {
+    const base = baseUrl.replace(/\/+$/, '').replace(/\/wp-json\/.*$/, '');
+    let html: string;
+    try {
+      const res = await nodeFetch(base, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+      if (!res.ok) return null;
+      html = await res.text();
+    } catch {
+      return null;
+    }
+
+    const logoMatch =
+      html.match(/<img[^>]+class="[^"]*custom-logo[^"]*"[^>]+src="([^"]+)"/i) ??
+      html.match(/<img[^>]+src="([^"]+)"[^>]+class="[^"]*custom-logo[^"]*"/i);
+
+    const ogMatch =
+      html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i) ?? html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
+
+    const iconMatch =
+      html.match(/<link[^>]+rel="(?:shortcut )?icon"[^>]+href="([^"]+)"/i) ?? html.match(/<link[^>]+href="([^"]+)"[^>]+rel="(?:shortcut )?icon"/i);
+
+    const rawUrl = logoMatch?.[1] ?? ogMatch?.[1] ?? iconMatch?.[1] ?? null;
+    if (!rawUrl) return null;
+
+    return rawUrl.startsWith('http') ? rawUrl : `${base}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
+  }
+
   public async syncSupplierCatalog(supplierId: string, userId: number): Promise<{ fetched: number; upserted: number; removed: number }> {
     const supplier = await this.findSupplierById(supplierId, userId);
     const sourceUrl = supplier.url && String(supplier.url).trim();
@@ -265,6 +293,11 @@ class SupplierService {
         sourceProductId: { [Op.notIn]: fetchedSourceProductIds },
       },
     });
+
+    const logoUrl = await this.fetchLogoFromHomepage(sourceUrl);
+    if (logoUrl !== null) {
+      await SupplierModel.update({ logoUrl }, { where: { id: sid } });
+    }
 
     return { fetched: products.length, upserted, removed };
   }
@@ -316,6 +349,14 @@ class SupplierService {
     const plain = supplier.get({ plain: true });
     await supplier.destroy();
     return plain;
+  }
+
+  public async getSupplierLogo(supplierId: string, userId: number): Promise<{ logoUrl: string | null }> {
+    const supplier = await this.findSupplierById(supplierId, userId);
+    const sourceUrl = supplier.url && String(supplier.url).trim();
+    if (!sourceUrl) return { logoUrl: null };
+    const logoUrl = await this.fetchLogoFromHomepage(sourceUrl);
+    return { logoUrl };
   }
 }
 

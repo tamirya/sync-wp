@@ -4,6 +4,7 @@ export interface Store {
   name: string;
   url: string;
   port: number | null;
+  logoUrl: string | null;
 }
 
 /** `GET /stores` — includes catalog aggregates. */
@@ -13,6 +14,7 @@ export interface StoreSummary {
   name: string;
   url: string;
   port: number | null;
+  logoUrl: string | null;
   productCount: number;
   categoryCount: number;
   /** Latest `updatedAt` from `store_catalog` / `store_categories` for this store (ISO). */

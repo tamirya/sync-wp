@@ -40,6 +40,17 @@ async function fetchStore(
   }
 }
 
+async function fetchStoreLogo(id: string): Promise<string | null> {
+  try {
+    const res = await backendFetch(`/stores/${id}/logo`);
+    if (!res.ok) return null;
+    const json = (await res.json()) as { data?: { logoUrl?: string | null } };
+    return json.data?.logoUrl ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchCategories(
   id: string,
 ): Promise<{ ok: true; categories: Category[] } | { ok: false }> {
@@ -218,11 +229,13 @@ export default async function StoreCategoriesPage({ params }: Props) {
   const locale = raw as Locale;
   const messages = getAppMessages(locale);
 
-  const [storeResult, categoriesResult, productCatResult] = await Promise.all([
-    fetchStore(id),
-    fetchCategories(id),
-    fetchProductCategoryIds(id),
-  ]);
+  const [storeResult, categoriesResult, productCatResult, logoUrl] =
+    await Promise.all([
+      fetchStore(id),
+      fetchCategories(id),
+      fetchProductCategoryIds(id),
+      fetchStoreLogo(id),
+    ]);
 
   if (!storeResult.ok) {
     if (storeResult.status === 401) {
@@ -296,11 +309,19 @@ export default async function StoreCategoriesPage({ params }: Props) {
 
       {/* Header */}
       <div className="mt-6 flex flex-wrap items-start gap-4">
-        <div
-          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 via-orange-400 to-rose-500 text-base font-bold text-white shadow-sm ring-2 ring-white/40"
-          aria-hidden
-        >
-          {store.name.slice(0, 2).toUpperCase()}
+        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl shadow-sm ring-2 ring-white/40">
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoUrl}
+              alt={store.name}
+              className="h-full w-full object-contain"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-amber-400 via-orange-400 to-rose-500 text-base font-bold text-white">
+              {store.name.slice(0, 2).toUpperCase()}
+            </div>
+          )}
         </div>
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">

@@ -17,6 +17,7 @@ class SuppliersRoute implements Routes {
   private initializeRoutes() {
     this.router.get(`${this.path}`, authMiddleware, this.suppliersController.getSuppliers);
     this.router.get(`${this.path}/:id/full`, authMiddleware, this.suppliersController.getSupplierFull);
+    this.router.get(`${this.path}/:id/logo`, authMiddleware, this.suppliersController.getSupplierLogo);
     this.router.get(`${this.path}/:id/categories`, authMiddleware, this.suppliersController.getSupplierCategories);
     this.router.post(`${this.path}/:id/categories/sync`, authMiddleware, this.suppliersController.syncSupplierCategories);
     this.router.post(`${this.path}/:id/catalog/sync`, authMiddleware, this.suppliersController.syncSupplierCatalog);

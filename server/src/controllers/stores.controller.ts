@@ -60,6 +60,16 @@ class StoresController {
     }
   };
 
+  public getStoreLogo = async (req: RequestWithUser, res: Response, next: NextFunction) => {
+    try {
+      const storeId: string = req.params.id;
+      const data = await this.storeService.getStoreLogo(storeId, req.user.id);
+      res.status(200).json({ data, message: 'storeLogo' });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   public getStoreById = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
       const storeId: string = req.params.id;

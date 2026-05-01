@@ -7,15 +7,17 @@ export interface SupplierAttributes {
   userId: number;
   name: string;
   url: string;
+  logoUrl: string | null;
 }
 
-export type SupplierCreationAttributes = Optional<SupplierAttributes, 'id'>;
+export type SupplierCreationAttributes = Optional<SupplierAttributes, 'id' | 'logoUrl'>;
 
 class SupplierModel extends Model<SupplierAttributes, SupplierCreationAttributes> implements SupplierAttributes {
   public id!: number;
   public userId!: number;
   public name!: string;
   public url!: string;
+  public logoUrl!: string | null;
 }
 
 SupplierModel.init(
@@ -42,6 +44,10 @@ SupplierModel.init(
     url: {
       type: DataTypes.STRING(2048),
       allowNull: false,
+    },
+    logoUrl: {
+      type: DataTypes.STRING(2048),
+      allowNull: true,
     },
   },
   {

@@ -22,6 +22,7 @@ export type StoreCardData = {
   /** ISO string or null */
   lastSynced: string | null;
   synced: boolean;
+  logoUrl: string | null;
 };
 
 type ApiListResponse = {
@@ -33,8 +34,7 @@ type ApiListResponse = {
  * Server-only: loads stores for the current user using the HttpOnly JWT cookie.
  */
 export async function fetchStoresForUser(): Promise<
-  | { ok: true; stores: StoreCardData[] }
-  | { ok: false; status: number }
+  { ok: true; stores: StoreCardData[] } | { ok: false; status: number }
 > {
   const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
   if (!base) {
@@ -59,18 +59,34 @@ export async function fetchStoresForUser(): Promise<
   const json = (await res.json()) as ApiListResponse;
   const rows = json.data ?? [];
 
-  const stores: StoreCardData[] = rows.map((s) => ({
+  const stores: Omit<StoreCardData, "logoUrl">[] = rows.map((s) => ({
     id: String(s.id),
     name: s.name,
     url: s.url,
-    products:
-      typeof s.productCount === "number" ? s.productCount : null,
-    categories:
-      typeof s.categoryCount === "number" ? s.categoryCount : null,
-    lastSynced:
-      typeof s.lastSyncedAt === "string" ? s.lastSyncedAt : null,
+    products: typeof s.productCount === "number" ? s.productCount : null,
+    categories: typeof s.categoryCount === "number" ? s.categoryCount : null,
+    lastSynced: typeof s.lastSyncedAt === "string" ? s.lastSyncedAt : null,
     synced: true,
   }));
 
-  return { ok: true, stores };
+  const logos = await Promise.all(
+    stores.map(async (s) => {
+      try {
+        const r = await fetch(`${base}/stores/${s.id}/logo`, {
+          headers: { Cookie: `${AUTH_JWT_COOKIE}=${token}` },
+          cache: "no-store",
+        });
+        if (!r.ok) return null;
+        const j = (await r.json()) as { data?: { logoUrl?: string | null } };
+        return j.data?.logoUrl ?? null;
+      } catch {
+        return null;
+      }
+    }),
+  );
+
+  return {
+    ok: true,
+    stores: stores.map((s, i) => ({ ...s, logoUrl: logos[i] ?? null })),
+  };
 }
