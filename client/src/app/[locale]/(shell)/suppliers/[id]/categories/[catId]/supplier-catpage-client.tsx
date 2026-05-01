@@ -405,7 +405,7 @@ type PersistedCatItem = {
   id: number;
   name: string;
   displayCount: number | null | undefined;
-  parentName: string | undefined;
+  categoryPath?: string[];
 };
 type PersistedProdItem = {
   id: number;
@@ -413,7 +413,7 @@ type PersistedProdItem = {
   sku: string;
   price: string | null;
   regularPrice: string | null;
-  parentName: string | undefined;
+  categoryPath?: string[];
 };
 type PersistedSelection = {
   catItems: PersistedCatItem[];
@@ -454,6 +454,7 @@ export function SupplierCatPageClient({
   locale,
   supplierId,
   currentCategoryName,
+  categoryPath,
 }: {
   subCategories: ClientSubCategory[];
   products: ClientProduct[];
@@ -462,30 +463,28 @@ export function SupplierCatPageClient({
   locale: string;
   supplierId: number;
   currentCategoryName?: string;
+  /** Full ancestor path including the current category, e.g. ["קיץ וים", "מוצרים חדשים"] */
+  categoryPath?: string[];
 }) {
   /* IDs — used for card highlight UI on the current page */
-  const [selectedCatIds, setSelectedCatIds] = useState<Set<number>>(() => {
-    if (typeof window === "undefined") return new Set();
-    const sel = loadSelection(supplierId);
-    return new Set(sel.catItems.map((c) => c.id));
-  });
-  const [selectedProdIds, setSelectedProdIds] = useState<Set<number>>(() => {
-    if (typeof window === "undefined") return new Set();
-    const sel = loadSelection(supplierId);
-    return new Set(sel.prodItems.map((p) => p.id));
-  });
+  const [selectedCatIds, setSelectedCatIds] = useState<Set<number>>(new Set());
+  const [selectedProdIds, setSelectedProdIds] = useState<Set<number>>(
+    new Set(),
+  );
 
   /* Full item data — displayed in the panel across all category pages */
-  const [panelCatItems, setPanelCatItems] = useState<PersistedCatItem[]>(() => {
-    if (typeof window === "undefined") return [];
-    return loadSelection(supplierId).catItems;
-  });
-  const [panelProdItems, setPanelProdItems] = useState<PersistedProdItem[]>(
-    () => {
-      if (typeof window === "undefined") return [];
-      return loadSelection(supplierId).prodItems;
-    },
-  );
+  const [panelCatItems, setPanelCatItems] = useState<PersistedCatItem[]>([]);
+  const [panelProdItems, setPanelProdItems] = useState<PersistedProdItem[]>([]);
+
+  /* Load persisted selection after hydration to avoid SSR mismatch */
+  useEffect(() => {
+    const sel = loadSelection(supplierId);
+    setSelectedCatIds(new Set(sel.catItems.map((c) => c.id)));
+    setSelectedProdIds(new Set(sel.prodItems.map((p) => p.id)));
+    setPanelCatItems(sel.catItems);
+    setPanelProdItems(sel.prodItems);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supplierId]);
 
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -533,7 +532,9 @@ export function SupplierCatPageClient({
               id,
               name: sub.name,
               displayCount: sub.displayCount,
-              parentName: currentCategoryName,
+              categoryPath: currentCategoryName
+                ? [...(categoryPath ?? [currentCategoryName])]
+                : undefined,
             },
           ]
         : panelCatItems;
@@ -562,7 +563,9 @@ export function SupplierCatPageClient({
               sku: prod.sku,
               price: prod.price,
               regularPrice: prod.regularPrice,
-              parentName: currentCategoryName,
+              categoryPath:
+                categoryPath ??
+                (currentCategoryName ? [currentCategoryName] : undefined),
             },
           ]
         : panelProdItems;

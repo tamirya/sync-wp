@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -10,7 +10,10 @@ export type PanelCategory = {
   id: number;
   name: string;
   displayCount?: number | null;
+  /** Legacy single-level grouping (still accepted for backward compat) */
   parentName?: string;
+  /** Full ancestor path from root, e.g. ["קיץ וים", "מוצרים חדשים"] */
+  categoryPath?: string[];
 };
 
 export type PanelProduct = {
@@ -19,7 +22,10 @@ export type PanelProduct = {
   sku?: string;
   price?: string | null;
   regularPrice?: string | null;
+  /** Legacy single-level grouping (still accepted for backward compat) */
   parentName?: string;
+  /** Full ancestor path from root, e.g. ["קיץ וים", "מוצרים חדשים"] */
+  categoryPath?: string[];
 };
 
 export type SelectionSidePanelMessages = {
@@ -62,37 +68,35 @@ type GroupedItem =
   | { kind: "prod"; item: PanelProduct };
 
 type Group = {
-  parentName: string | undefined;
+  /** Full ancestor path used as group key, e.g. ["קיץ וים", "מוצרים חדשים"] */
+  categoryPath: string[];
   items: GroupedItem[];
 };
+
+function resolveItemPath(item: PanelCategory | PanelProduct): string[] {
+  if (item.categoryPath !== undefined) return item.categoryPath;
+  if (item.parentName) return [item.parentName];
+  return [];
+}
 
 function buildGroups(cats: PanelCategory[], prods: PanelProduct[]): Group[] {
   const map = new Map<string, GroupedItem[]>();
   const order: string[] = [];
 
-  function key(name: string | undefined) {
-    return name ?? "__none__";
+  function add(item: PanelCategory | PanelProduct, entry: GroupedItem) {
+    const k = JSON.stringify(resolveItemPath(item));
+    if (!map.has(k)) {
+      map.set(k, []);
+      order.push(k);
+    }
+    map.get(k)!.push(entry);
   }
 
-  for (const cat of cats) {
-    const k = key(cat.parentName);
-    if (!map.has(k)) {
-      map.set(k, []);
-      order.push(k);
-    }
-    map.get(k)!.push({ kind: "cat", item: cat });
-  }
-  for (const prod of prods) {
-    const k = key(prod.parentName);
-    if (!map.has(k)) {
-      map.set(k, []);
-      order.push(k);
-    }
-    map.get(k)!.push({ kind: "prod", item: prod });
-  }
+  for (const cat of cats) add(cat, { kind: "cat", item: cat });
+  for (const prod of prods) add(prod, { kind: "prod", item: prod });
 
   return order.map((k) => ({
-    parentName: k === "__none__" ? undefined : k,
+    categoryPath: JSON.parse(k) as string[],
     items: map.get(k)!,
   }));
 }
@@ -132,6 +136,134 @@ function ProductIcon({ className }: { className?: string }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Recursive group content renderer                                    */
+/* ------------------------------------------------------------------ */
+
+function renderItemList(
+  items: GroupedItem[],
+  onToggleCategory: (id: number) => void,
+  onToggleProduct: (id: number) => void,
+): React.ReactNode {
+  return (
+    <ul className="relative mr-[9px] border-r border-border/40">
+      {items.map((entry, idx) => {
+        const isLast = idx === items.length - 1;
+        const branch = (
+          <span
+            className="pointer-events-none absolute right-0 top-[14px] h-px w-4 bg-border/40"
+            aria-hidden
+          />
+        );
+        const clip = isLast ? (
+          <span
+            className="pointer-events-none absolute bottom-0 right-[-1px] top-[14px] w-[2px] bg-card"
+            aria-hidden
+          />
+        ) : null;
+
+        if (entry.kind === "cat") {
+          const cat = entry.item;
+          return (
+            <li key={`cat-${cat.id}`} className="relative">
+              {branch}
+              {clip}
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg py-1.5 pe-2 ps-6 hover:bg-muted-bg/70">
+                <input
+                  type="checkbox"
+                  checked
+                  onChange={() => onToggleCategory(cat.id)}
+                  className="h-3.5 w-3.5 shrink-0 rounded accent-primary"
+                />
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-amber-50 ring-1 ring-amber-200">
+                  <FolderIcon className="h-3 w-3 text-amber-500" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[11px] font-semibold text-foreground">
+                    {cat.name}
+                  </span>
+                  {cat.displayCount != null && (
+                    <span className="text-[10px] text-muted">
+                      {cat.displayCount} פריטים
+                    </span>
+                  )}
+                </span>
+              </label>
+            </li>
+          );
+        } else {
+          const prod = entry.item;
+          return (
+            <li key={`prod-${prod.id}`} className="relative">
+              {branch}
+              {clip}
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg py-1.5 pe-2 ps-6 hover:bg-muted-bg/70">
+                <input
+                  type="checkbox"
+                  checked
+                  onChange={() => onToggleProduct(prod.id)}
+                  className="h-3.5 w-3.5 shrink-0 rounded accent-primary"
+                />
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-primary/10 ring-1 ring-primary/20">
+                  <ProductIcon className="h-3 w-3 text-primary" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[11px] font-semibold text-foreground">
+                    {prod.name}
+                  </span>
+                  {(prod.price ?? prod.regularPrice) && (
+                    <span className="text-[10px] font-medium text-primary/80">
+                      {prod.price ?? prod.regularPrice}
+                    </span>
+                  )}
+                </span>
+              </label>
+            </li>
+          );
+        }
+      })}
+    </ul>
+  );
+}
+
+function renderGroupContent(
+  remainingPath: string[],
+  items: GroupedItem[],
+  onToggleCategory: (id: number) => void,
+  onToggleProduct: (id: number) => void,
+): React.ReactNode {
+  if (remainingPath.length === 0) {
+    return renderItemList(items, onToggleCategory, onToggleProduct);
+  }
+
+  const [segment, ...rest] = remainingPath;
+  const isLastPathNode = rest.length === 0;
+
+  return (
+    <ul className="relative mr-[9px] border-r border-border/40">
+      <li className="relative">
+        <span
+          className="pointer-events-none absolute right-0 top-[14px] h-px w-4 bg-border/40"
+          aria-hidden
+        />
+        {isLastPathNode && (
+          <span
+            className="pointer-events-none absolute bottom-0 right-[-1px] top-[14px] w-[2px] bg-card"
+            aria-hidden
+          />
+        )}
+        <div className="flex items-center gap-1.5 py-1.5 ps-6 opacity-75">
+          <FolderIcon className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+          <span className="truncate text-[10px] font-semibold text-foreground/70">
+            {segment}
+          </span>
+        </div>
+        {renderGroupContent(rest, items, onToggleCategory, onToggleProduct)}
+      </li>
+    </ul>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Component                                                           */
 /* ------------------------------------------------------------------ */
 
@@ -167,11 +299,15 @@ export function SelectionSidePanel({
     if (anySelected) setOpen(true);
   }, [anySelected]);
 
-  /* close on outside click */
+  /* close on outside click — only when nothing is selected */
   useEffect(() => {
     if (!open) return;
     function handle(e: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+      if (
+        !anySelected &&
+        panelRef.current &&
+        !panelRef.current.contains(e.target as Node)
+      ) {
         setOpen(false);
       }
     }
@@ -192,7 +328,7 @@ export function SelectionSidePanel({
     >
       {/* ── Panel body ────────────────────────────────────────────── */}
       <div
-        className={`h-full w-72 flex-col overflow-hidden border-r border-border bg-card shadow-[4px_0_24px_rgba(0,0,0,0.10)] ${open ? "flex" : "hidden"}`}
+        className={`relative h-full w-72 flex flex-col overflow-visible border-r border-border bg-card shadow-[4px_0_24px_rgba(0,0,0,0.10)] transition-transform duration-300 ease-in-out ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-border/60 bg-muted-bg/50 px-4 py-3">
@@ -250,6 +386,8 @@ export function SelectionSidePanel({
             <ul className="space-y-4">
               {groups.map((group, gi) => {
                 const collapsed = collapsedGroups.has(gi);
+                const path = group.categoryPath;
+
                 return (
                   <li key={gi}>
                     {/* Root node — clickable header with collapse arrow */}
@@ -260,7 +398,7 @@ export function SelectionSidePanel({
                     >
                       <FolderIcon className="h-4 w-4 shrink-0 text-amber-500" />
                       <span className="flex-1 truncate text-right text-xs font-bold text-foreground">
-                        {group.parentName ?? messages.panelCategoriesSection}
+                        {path[0] ?? messages.panelCategoriesSection}
                       </span>
                       <span className="shrink-0 rounded-full bg-border/50 px-1.5 py-0.5 text-[10px] font-semibold text-muted">
                         {group.items.length}
@@ -281,90 +419,14 @@ export function SelectionSidePanel({
                       </svg>
                     </button>
 
-                    {/* Children — tree lines, hidden when collapsed */}
-                    <ul
-                      className={`relative mr-[9px] border-r border-border/40 ${collapsed ? "hidden" : ""}`}
-                    >
-                      {group.items.map((entry, idx) => {
-                        const isLast = idx === group.items.length - 1;
-
-                        const sharedLi = "relative";
-                        /* horizontal branch connector */
-                        const branch = (
-                          <span
-                            className="pointer-events-none absolute right-0 top-[14px] h-px w-4 bg-border/40"
-                            aria-hidden
-                          />
-                        );
-                        /* white overlay to clip the vertical line after the last item */
-                        const clip = isLast ? (
-                          <span
-                            className="pointer-events-none absolute bottom-0 right-[-1px] top-[14px] w-[2px] bg-card"
-                            aria-hidden
-                          />
-                        ) : null;
-
-                        if (entry.kind === "cat") {
-                          const cat = entry.item;
-                          return (
-                            <li key={`cat-${cat.id}`} className={sharedLi}>
-                              {branch}
-                              {clip}
-                              <label className="flex cursor-pointer items-center gap-2 rounded-lg py-1.5 pe-2 ps-6 hover:bg-muted-bg/70">
-                                <input
-                                  type="checkbox"
-                                  checked
-                                  onChange={() => onToggleCategory(cat.id)}
-                                  className="h-3.5 w-3.5 shrink-0 rounded accent-primary"
-                                />
-                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-amber-50 ring-1 ring-amber-200">
-                                  <FolderIcon className="h-3 w-3 text-amber-500" />
-                                </span>
-                                <span className="min-w-0 flex-1">
-                                  <span className="block truncate text-[11px] font-semibold text-foreground">
-                                    {cat.name}
-                                  </span>
-                                  {cat.displayCount != null && (
-                                    <span className="text-[10px] text-muted">
-                                      {cat.displayCount} פריטים
-                                    </span>
-                                  )}
-                                </span>
-                              </label>
-                            </li>
-                          );
-                        } else {
-                          const prod = entry.item;
-                          return (
-                            <li key={`prod-${prod.id}`} className={sharedLi}>
-                              {branch}
-                              {clip}
-                              <label className="flex cursor-pointer items-center gap-2 rounded-lg py-1.5 pe-2 ps-6 hover:bg-muted-bg/70">
-                                <input
-                                  type="checkbox"
-                                  checked
-                                  onChange={() => onToggleProduct(prod.id)}
-                                  className="h-3.5 w-3.5 shrink-0 rounded accent-primary"
-                                />
-                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-primary/10 ring-1 ring-primary/20">
-                                  <ProductIcon className="h-3 w-3 text-primary" />
-                                </span>
-                                <span className="min-w-0 flex-1">
-                                  <span className="block truncate text-[11px] font-semibold text-foreground">
-                                    {prod.name}
-                                  </span>
-                                  {(prod.price ?? prod.regularPrice) && (
-                                    <span className="text-[10px] font-medium text-primary/80">
-                                      {prod.price ?? prod.regularPrice}
-                                    </span>
-                                  )}
-                                </span>
-                              </label>
-                            </li>
-                          );
-                        }
-                      })}
-                    </ul>
+                    {/* Children — nested path folders + items */}
+                    {!collapsed &&
+                      renderGroupContent(
+                        path.slice(1),
+                        group.items,
+                        onToggleCategory,
+                        onToggleProduct,
+                      )}
                   </li>
                 );
               })}
@@ -411,34 +473,34 @@ export function SelectionSidePanel({
             </button>
           </div>
         )}
-      </div>
 
-      {/* ── Toggle tab ────────────────────────────────────────────── */}
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className={`absolute -right-9 top-1/2 -translate-y-1/2 flex-col items-center justify-center gap-1 rounded-r-xl border border-l-0 border-border bg-card shadow-md hover:bg-muted-bg ${open ? "hidden" : "flex h-16 w-9"}`}
-        aria-label={messages.panelTitle}
-      >
-        <svg
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          className="h-4 w-4 text-primary"
-          aria-hidden
+        {/* ── Toggle tab — inside panel so it slides with it ──────── */}
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="absolute -right-9 top-1/2 -translate-y-1/2 flex h-16 w-9 flex-col items-center justify-center gap-1 rounded-r-xl border border-l-0 border-border bg-card shadow-md hover:bg-muted-bg"
+          aria-label={messages.panelTitle}
         >
-          <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-          <path
-            fillRule="evenodd"
-            d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9 4a1 1 0 10-2 0v3a1 1 0 102 0V9zm-3 0a1 1 0 10-2 0v3a1 1 0 102 0V9z"
-            clipRule="evenodd"
-          />
-        </svg>
-        {totalCount > 0 && (
-          <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground leading-none">
-            {totalCount}
-          </span>
-        )}
-      </button>
+          <svg
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className="h-4 w-4 text-primary"
+            aria-hidden
+          >
+            <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+            <path
+              fillRule="evenodd"
+              d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9 4a1 1 0 10-2 0v3a1 1 0 102 0V9zm-3 0a1 1 0 10-2 0v3a1 1 0 102 0V9z"
+              clipRule="evenodd"
+            />
+          </svg>
+          {totalCount > 0 && (
+            <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground leading-none">
+              {totalCount}
+            </span>
+          )}
+        </button>
+      </div>
     </div>
   );
 }

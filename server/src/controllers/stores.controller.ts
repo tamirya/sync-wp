@@ -20,6 +20,38 @@ class StoresController {
     }
   };
 
+  public createStoreCategory = async (req: RequestWithUser, res: Response, next: NextFunction) => {
+    try {
+      const storeId: string = req.params.id;
+      const data = await this.storeService.createStoreCategory(storeId, req.user.id, req.body);
+      res.status(201).json({ data, message: 'categoryCreated' });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public updateStoreCategory = async (req: RequestWithUser, res: Response, next: NextFunction) => {
+    try {
+      const storeId: string = req.params.id;
+      const catId: string = req.params.catId;
+      const data = await this.storeService.updateStoreCategory(storeId, catId, req.user.id, req.body);
+      res.status(200).json({ data, message: 'categoryUpdated' });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public deleteStoreCategory = async (req: RequestWithUser, res: Response, next: NextFunction) => {
+    try {
+      const storeId: string = req.params.id;
+      const catId: string = req.params.catId;
+      const data = await this.storeService.deleteStoreCategory(storeId, catId, req.user.id);
+      res.status(200).json({ data, message: 'categoryDeleted' });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   public getStoreCategories = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
       const storeId: string = req.params.id;

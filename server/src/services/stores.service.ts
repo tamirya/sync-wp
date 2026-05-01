@@ -241,6 +241,107 @@ class StoreService {
     return { fetched: categories.length, upserted, removed };
   }
 
+  public async createStoreCategory(
+    storeId: string,
+    userId: number,
+    body: { name: string; parent?: number; slug?: string; description?: string },
+  ): Promise<StoreProductCategory> {
+    const store = await this.findStoreById(storeId, userId);
+    const id = Number(storeId);
+    if (Number.isNaN(id)) throw new HttpException(400, 'StoreId is invalid');
+
+    const env = await this.envToStoreService.findEnvToStoreByStoreId(storeId, userId);
+    const woo = createStoreWooClient(store.url, env.consumerKey, env.consumerSecret, store.port);
+
+    let created: StoreProductCategory;
+    try {
+      const res = await woo.post('products/categories', {
+        name: body.name,
+        ...(body.parent != null ? { parent: body.parent } : {}),
+        ...(body.slug ? { slug: body.slug } : {}),
+        ...(body.description ? { description: body.description } : {}),
+      });
+      created = res.data as StoreProductCategory;
+    } catch (err) {
+      throw new HttpException(400, wooClientErrorMessage(err));
+    }
+
+    const wooCategoryId = typeof created.id === 'number' ? created.id : Number(created.id);
+    await StoreCategoryModel.upsert({
+      storeId: id,
+      wooCategoryId,
+      parent: typeof created.parent === 'number' ? created.parent : null,
+      name: created.name,
+      slug: created.slug,
+      count: typeof created.count === 'number' ? created.count : null,
+      payload: created as object,
+    });
+
+    return created;
+  }
+
+  public async updateStoreCategory(
+    storeId: string,
+    catId: string,
+    userId: number,
+    body: { name?: string; parent?: number; slug?: string; description?: string },
+  ): Promise<StoreProductCategory> {
+    const store = await this.findStoreById(storeId, userId);
+    const id = Number(storeId);
+    const wooCategoryId = Number(catId);
+    if (Number.isNaN(id) || Number.isNaN(wooCategoryId)) throw new HttpException(400, 'Invalid id');
+
+    const env = await this.envToStoreService.findEnvToStoreByStoreId(storeId, userId);
+    const woo = createStoreWooClient(store.url, env.consumerKey, env.consumerSecret, store.port);
+
+    let updated: StoreProductCategory;
+    try {
+      const res = await woo.put(`products/categories/${wooCategoryId}`, {
+        ...(body.name != null ? { name: body.name } : {}),
+        ...(body.parent != null ? { parent: body.parent } : {}),
+        ...(body.slug ? { slug: body.slug } : {}),
+        ...(body.description != null ? { description: body.description } : {}),
+      });
+      updated = res.data as StoreProductCategory;
+    } catch (err) {
+      throw new HttpException(400, wooClientErrorMessage(err));
+    }
+
+    await StoreCategoryModel.update(
+      {
+        name: updated.name,
+        slug: updated.slug,
+        parent: typeof updated.parent === 'number' ? updated.parent : null,
+        count: typeof updated.count === 'number' ? updated.count : null,
+        payload: updated as object,
+      },
+      { where: { storeId: id, wooCategoryId } },
+    );
+
+    return updated;
+  }
+
+  public async deleteStoreCategory(storeId: string, catId: string, userId: number): Promise<{ wooCategoryId: number }> {
+    const store = await this.findStoreById(storeId, userId);
+    const id = Number(storeId);
+    const wooCategoryId = Number(catId);
+    if (Number.isNaN(id) || Number.isNaN(wooCategoryId)) throw new HttpException(400, 'Invalid id');
+
+    const env = await this.envToStoreService.findEnvToStoreByStoreId(storeId, userId);
+    const woo = createStoreWooClient(store.url, env.consumerKey, env.consumerSecret, store.port);
+
+    try {
+      await woo.delete(`products/categories/${wooCategoryId}`, { force: true });
+    } catch (err) {
+      const st = wooResponseStatus(err);
+      if (st !== 404) throw new HttpException(400, wooClientErrorMessage(err));
+    }
+
+    await StoreCategoryModel.destroy({ where: { storeId: id, wooCategoryId } });
+
+    return { wooCategoryId };
+  }
+
   /**
    * For each category in `store_categories` for this store, permanently delete it from Woo REST API (`force: true`).
    * Does not touch the local DB — run `POST /stores/:id/categories/sync` afterwards to clean up.

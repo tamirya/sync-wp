@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   SyncToStoreModal,
@@ -115,17 +115,18 @@ export function SupplierCategoriesClient({
   totalCountMap: Record<number, number>;
 }) {
   /* IDs — for card highlight */
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => {
-    if (typeof window === "undefined") return new Set();
-    const cats = loadSelection(supplierId);
-    return new Set(cats.map((c) => c.id));
-  });
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   /* Full items — for panel display */
-  const [panelCatItems, setPanelCatItems] = useState<PersistedCatItem[]>(() => {
-    if (typeof window === "undefined") return [];
-    return loadSelection(supplierId);
-  });
+  const [panelCatItems, setPanelCatItems] = useState<PersistedCatItem[]>([]);
+
+  /* Load persisted selection after hydration to avoid SSR mismatch */
+  useEffect(() => {
+    const cats = loadSelection(supplierId);
+    setSelectedIds(new Set(cats.map((c) => c.id)));
+    setPanelCatItems(cats);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supplierId]);
 
   const [syncModalOpen, setSyncModalOpen] = useState(false);
 

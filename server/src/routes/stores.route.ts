@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import StoresController from '@controllers/stores.controller';
 import { ClearStoreWooProductsDto } from '@dtos/clear-store-woo-products.dto';
+import { CreateStoreCategoryDto, UpdateStoreCategoryDto } from '@dtos/store-categories.dto';
 import { ImportStoreProductsDto } from '@dtos/import-store-products.dto';
 import { SyncStoreRulesImportDto } from '@dtos/sync-store-rules-import.dto';
 import { SyncSingleRuleImportDto } from '@dtos/sync-single-rule-import.dto';
@@ -22,6 +23,19 @@ class StoresRoute implements Routes {
     this.router.get(`${this.path}`, authMiddleware, this.storesController.getStores);
     this.router.get(`${this.path}/:id/logo`, authMiddleware, this.storesController.getStoreLogo);
     this.router.get(`${this.path}/:id/categories`, authMiddleware, this.storesController.getStoreCategories);
+    this.router.post(
+      `${this.path}/:id/categories`,
+      authMiddleware,
+      validationMiddleware(CreateStoreCategoryDto, 'body'),
+      this.storesController.createStoreCategory,
+    );
+    this.router.put(
+      `${this.path}/:id/categories/:catId`,
+      authMiddleware,
+      validationMiddleware(UpdateStoreCategoryDto, 'body', true),
+      this.storesController.updateStoreCategory,
+    );
+    this.router.delete(`${this.path}/:id/categories/:catId`, authMiddleware, this.storesController.deleteStoreCategory);
     this.router.post(`${this.path}/:id/categories/sync`, authMiddleware, this.storesController.syncStoreCategories);
     this.router.post(
       `${this.path}/:id/categories/clear`,

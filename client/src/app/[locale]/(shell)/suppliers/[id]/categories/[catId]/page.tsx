@@ -1,3 +1,4 @@
+import React from "react";
 import Link from "next/link";
 import { isLocale, type Locale } from "@/i18n/config";
 import { notFound, redirect } from "next/navigation";
@@ -255,18 +256,15 @@ export default async function SupplierCategoryProductsPage({ params }: Props) {
           {supplier.name}
         </Link>
         {ancestors.map((anc) => (
-          <>
-            <span key={`sep-${anc.id}`} className="text-muted/60">
-              /
-            </span>
+          <React.Fragment key={anc.id}>
+            <span className="text-muted/60">/</span>
             <Link
-              key={anc.id}
               href={`/${locale}/suppliers/${id}/categories/${anc.id}`}
               className="font-semibold text-primary hover:underline"
             >
               {anc.name}
             </Link>
-          </>
+          </React.Fragment>
         ))}
         <span className="text-muted/60">/</span>
         <span className="truncate text-muted">{category?.name ?? catId}</span>
@@ -311,6 +309,10 @@ export default async function SupplierCategoryProductsPage({ params }: Props) {
 
       <SupplierCatPageClient
         currentCategoryName={category?.name}
+        categoryPath={[
+          ...ancestors.map((a) => a.name),
+          ...(category?.name ? [category.name] : []),
+        ]}
         subCategories={subCategories.map(
           (sub): ClientSubCategory => ({
             id: sub.id,

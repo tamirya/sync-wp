@@ -145,6 +145,25 @@ export type AppMessages = {
   storeCategoriesBack: string;
   storeCategoriesEmpty: string;
   storeCategoriesLoadError: string;
+  storeCategoryManageToggle: string;
+  storeCategoryManageDone: string;
+  storeCategoryAdd: string;
+  storeCategoryEditAria: string;
+  storeCategoryDeleteAria: string;
+  storeCategoryFormNameLabel: string;
+  storeCategoryFormParentLabel: string;
+  storeCategoryFormParentRoot: string;
+  storeCategoryFormSave: string;
+  storeCategoryFormSaving: string;
+  storeCategoryFormCancel: string;
+  storeCategoryFormTitleCreate: string;
+  storeCategoryFormTitleEdit: string;
+  storeCategoryDeleteTitle: string;
+  storeCategoryDeleteBody: string;
+  storeCategoryDeleteConfirm: string;
+  storeCategoryDeleteConfirming: string;
+  storeCategorySaveError: string;
+  storeCategoryDeleteError: string;
   storeCategoryProducts: string;
   storeCategoryRoot: string;
   storeCategoryParent: string;
@@ -327,6 +346,26 @@ const he: AppMessages = {
   storeCategoriesEmpty:
     "אין קטגוריות מסונכרנות עדיין. סנכרן קטגוריות מדף החנויות.",
   storeCategoriesLoadError: "לא ניתן לטעון קטגוריות. נסה לרענן.",
+  storeCategoryManageToggle: "ניהול",
+  storeCategoryManageDone: "סיום ניהול",
+  storeCategoryAdd: "הוסף קטגוריה",
+  storeCategoryEditAria: "ערוך קטגוריה",
+  storeCategoryDeleteAria: "מחק קטגוריה",
+  storeCategoryFormNameLabel: "שם הקטגוריה",
+  storeCategoryFormParentLabel: "קטגוריית אב",
+  storeCategoryFormParentRoot: "ראשית (ללא אב)",
+  storeCategoryFormSave: "שמור",
+  storeCategoryFormSaving: "שומר…",
+  storeCategoryFormCancel: "ביטול",
+  storeCategoryFormTitleCreate: "קטגוריה חדשה",
+  storeCategoryFormTitleEdit: "עריכת קטגוריה",
+  storeCategoryDeleteTitle: "מחיקת קטגוריה",
+  storeCategoryDeleteBody:
+    "פעולה זו תמחק את הקטגוריה גם מ-WooCommerce. לא ניתן לבטל.",
+  storeCategoryDeleteConfirm: "מחק",
+  storeCategoryDeleteConfirming: "מוחק…",
+  storeCategorySaveError: "שמירה נכשלה:",
+  storeCategoryDeleteError: "המחיקה נכשלה:",
   storeCategoryProducts: "מוצרים",
   storeCategoryRoot: "קטגוריה ראשית",
   storeCategoryParent: "תת-קטגוריה",
@@ -512,6 +551,26 @@ const en: AppMessages = {
   storeCategoriesEmpty:
     "No synced categories yet. Sync categories from the stores page.",
   storeCategoriesLoadError: "Could not load categories. Try refreshing.",
+  storeCategoryManageToggle: "Manage",
+  storeCategoryManageDone: "Done",
+  storeCategoryAdd: "Add category",
+  storeCategoryEditAria: "Edit category",
+  storeCategoryDeleteAria: "Delete category",
+  storeCategoryFormNameLabel: "Category name",
+  storeCategoryFormParentLabel: "Parent category",
+  storeCategoryFormParentRoot: "Root (no parent)",
+  storeCategoryFormSave: "Save",
+  storeCategoryFormSaving: "Saving…",
+  storeCategoryFormCancel: "Cancel",
+  storeCategoryFormTitleCreate: "New category",
+  storeCategoryFormTitleEdit: "Edit category",
+  storeCategoryDeleteTitle: "Delete category",
+  storeCategoryDeleteBody:
+    "This will permanently delete the category from WooCommerce. This cannot be undone.",
+  storeCategoryDeleteConfirm: "Delete",
+  storeCategoryDeleteConfirming: "Deleting…",
+  storeCategorySaveError: "Save failed:",
+  storeCategoryDeleteError: "Delete failed:",
   storeCategoryProducts: "products",
   storeCategoryRoot: "Root category",
   storeCategoryParent: "Subcategory",

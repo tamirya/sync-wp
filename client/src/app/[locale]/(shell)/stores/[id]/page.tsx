@@ -3,18 +3,17 @@ import { isLocale, type Locale } from "@/i18n/config";
 import { notFound, redirect } from "next/navigation";
 import { backendFetch } from "@/lib/backend-fetch";
 import { getAppMessages } from "@/messages/app";
+import CategoryManageClient, {
+  CategoryCardWrapper,
+  type CategoryItem,
+} from "./category-manage-client";
 
 type CategoryImage = {
   src?: string | null;
   alt?: string | null;
 };
 
-type Category = {
-  id: number;
-  name: string;
-  slug: string;
-  parent: number;
-  count?: number;
+type Category = CategoryItem & {
   /** WC REST v3: single image object */
   image?: CategoryImage | null;
   /** WC Store API: array of images */
@@ -341,43 +340,62 @@ export default async function StoreCategoriesPage({ params }: Props) {
             {messages.storeCategoriesLoadError}
           </p>
         ) : rootCategories.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-card/40 px-8 py-16 text-center">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              className="h-12 w-12 text-muted/50"
-              aria-hidden
+          <>
+            <CategoryManageClient
+              locale={locale}
+              storeId={id}
+              categories={categories}
+              messages={messages}
             >
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-            </svg>
-            <p className="mt-4 max-w-sm text-sm text-muted">
-              {messages.storeCategoriesEmpty}
-            </p>
-          </div>
+              <div className="mt-6 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-card/40 px-8 py-16 text-center">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  className="h-12 w-12 text-muted/50"
+                  aria-hidden
+                >
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                </svg>
+                <p className="mt-4 max-w-sm text-sm text-muted">
+                  {messages.storeCategoriesEmpty}
+                </p>
+              </div>
+            </CategoryManageClient>
+          </>
         ) : (
           <>
-            <p className="mb-6 text-sm text-muted">
+            <p className="text-sm text-muted">
               {messages.storeCategoriesSubtitle}{" "}
               <span className="font-semibold text-foreground">
                 ({rootCategories.length})
               </span>
             </p>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {rootCategories.map((cat) => (
-                <CategoryCard
-                  key={cat.id}
-                  category={cat}
-                  parentName={
-                    cat.parent !== 0 ? (nameById.get(cat.parent) ?? null) : null
-                  }
-                  messages={messages}
-                  href={`/${locale}/stores/${id}/categories/${cat.id}`}
-                  displayCount={totalCount(cat.id)}
-                />
-              ))}
-            </div>
+            <CategoryManageClient
+              locale={locale}
+              storeId={id}
+              categories={categories}
+              messages={messages}
+            >
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {rootCategories.map((cat) => (
+                  <CategoryCardWrapper key={cat.id} category={cat}>
+                    <CategoryCard
+                      category={cat}
+                      parentName={
+                        cat.parent !== 0
+                          ? (nameById.get(cat.parent) ?? null)
+                          : null
+                      }
+                      messages={messages}
+                      href={`/${locale}/stores/${id}/categories/${cat.id}`}
+                      displayCount={totalCount(cat.id)}
+                    />
+                  </CategoryCardWrapper>
+                ))}
+              </div>
+            </CategoryManageClient>
           </>
         )}
       </div>

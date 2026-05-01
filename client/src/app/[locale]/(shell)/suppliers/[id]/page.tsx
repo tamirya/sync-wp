@@ -215,7 +215,7 @@ export default async function SupplierCategoriesPage({ params }: Props) {
 
       {/* Header */}
       <div className="mt-6 flex flex-wrap items-start gap-4">
-        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl shadow-sm ring-2 ring-white/40">
+        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl shadow-sm ring-2 ring-white/40">
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
