@@ -16,13 +16,19 @@ class SuppliersRoute implements Routes {
 
   private initializeRoutes() {
     this.router.get(`${this.path}`, authMiddleware, this.suppliersController.getSuppliers);
+    this.router.get(`${this.path}/:id/full`, authMiddleware, this.suppliersController.getSupplierFull);
     this.router.get(`${this.path}/:id/categories`, authMiddleware, this.suppliersController.getSupplierCategories);
     this.router.post(`${this.path}/:id/categories/sync`, authMiddleware, this.suppliersController.syncSupplierCategories);
     this.router.post(`${this.path}/:id/catalog/sync`, authMiddleware, this.suppliersController.syncSupplierCatalog);
     this.router.get(`${this.path}/:id/products`, authMiddleware, this.suppliersController.getSupplierProducts);
     this.router.get(`${this.path}/:id`, authMiddleware, this.suppliersController.getSupplierById);
     this.router.post(`${this.path}`, authMiddleware, validationMiddleware(CreateSupplierDto, 'body'), this.suppliersController.createSupplier);
-    this.router.put(`${this.path}/:id`, authMiddleware, validationMiddleware(CreateSupplierDto, 'body', true), this.suppliersController.updateSupplier);
+    this.router.put(
+      `${this.path}/:id`,
+      authMiddleware,
+      validationMiddleware(CreateSupplierDto, 'body', true),
+      this.suppliersController.updateSupplier,
+    );
     this.router.delete(`${this.path}/:id`, authMiddleware, this.suppliersController.deleteSupplier);
   }
 }

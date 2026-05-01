@@ -57,6 +57,16 @@ class SuppliersController {
     }
   };
 
+  public getSupplierFull = async (req: RequestWithUser, res: Response, next: NextFunction) => {
+    try {
+      const supplierId: string = req.params.id;
+      const data = await this.supplierService.getSupplierFull(supplierId, req.user.id);
+      res.status(200).json({ data, message: 'full' });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   public getSupplierById = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
       const supplierId: string = req.params.id;

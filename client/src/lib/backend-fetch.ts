@@ -5,6 +5,7 @@ import { AUTH_JWT_COOKIE } from "@/lib/auth-session";
 export async function backendFetch(
   path: string,
   init: RequestInit = {},
+  revalidate?: number,
 ): Promise<Response> {
   const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
   if (!base) {
@@ -28,9 +29,16 @@ export async function backendFetch(
   }
   headers.set("Cookie", `${AUTH_JWT_COOKIE}=${token}`);
 
+  const cacheOptions: RequestInit =
+    revalidate !== undefined
+      ? { next: { revalidate } as NextFetchRequestConfig }
+      : { cache: "no-store" };
+
   return fetch(url, {
     ...init,
+    ...cacheOptions,
     headers,
-    cache: "no-store",
   });
 }
+
+type NextFetchRequestConfig = { revalidate?: number | false; tags?: string[] };

@@ -38,22 +38,14 @@ class SupplierService {
     };
 
     const productAgg = (await SupplierCatalogModel.findAll({
-      attributes: [
-        'supplierId',
-        [fn('COUNT', col('id')), 'productCount'],
-        [fn('MAX', col('updatedAt')), 'lastProductAt'],
-      ],
+      attributes: ['supplierId', [fn('COUNT', col('id')), 'productCount'], [fn('MAX', col('updatedAt')), 'lastProductAt']],
       where: { supplierId: { [Op.in]: supplierIds } },
       group: ['supplierId'],
       raw: true,
     })) as unknown as ProductAgg[];
 
     const categoryAgg = (await SupplierCategoryModel.findAll({
-      attributes: [
-        'supplierId',
-        [fn('COUNT', col('id')), 'categoryCount'],
-        [fn('MAX', col('updatedAt')), 'lastCategoryAt'],
-      ],
+      attributes: ['supplierId', [fn('COUNT', col('id')), 'categoryCount'], [fn('MAX', col('updatedAt')), 'lastCategoryAt']],
       where: { supplierId: { [Op.in]: supplierIds } },
       group: ['supplierId'],
       raw: true,
@@ -126,10 +118,7 @@ class SupplierService {
     });
   }
 
-  public async syncSupplierCategories(
-    supplierId: string,
-    userId: number,
-  ): Promise<{ fetched: number; upserted: number; removed: number }> {
+  public async syncSupplierCategories(supplierId: string, userId: number): Promise<{ fetched: number; upserted: number; removed: number }> {
     const supplier = await this.findSupplierById(supplierId, userId);
     const sourceUrl = supplier.url && String(supplier.url).trim();
     if (!sourceUrl) {
@@ -171,13 +160,51 @@ class SupplierService {
   /** Products from `supplier_catalog` (run `POST /suppliers/:id/catalog/sync` to refresh from Store API). */
   public async getSupplierProducts(supplierId: string, userId: number): Promise<StoreApiProduct[]> {
     const supplier = await this.findSupplierById(supplierId, userId);
+    return this._mapCatalogRows(
+      await SupplierCatalogModel.findAll({
+        where: { supplierId: supplier.id },
+        order: [['sourceProductId', 'ASC']],
+      }),
+    );
+  }
+
+  /** Single endpoint that returns supplier + categories + products with one DB auth check. */
+  public async getSupplierFull(
+    supplierId: string,
+    userId: number,
+  ): Promise<{ supplier: Supplier; categories: StoreApiProductCategory[]; products: StoreApiProduct[] }> {
+    const supplier = await this.findSupplierById(supplierId, userId);
     const id = supplier.id;
 
-    const rows = await SupplierCatalogModel.findAll({
-      where: { supplierId: id },
-      order: [['sourceProductId', 'ASC']],
+    const [categoryRows, catalogRows] = await Promise.all([
+      SupplierCategoryModel.findAll({ where: { supplierId: id }, order: [['sourceCategoryId', 'ASC']] }),
+      SupplierCatalogModel.findAll({ where: { supplierId: id }, order: [['sourceProductId', 'ASC']] }),
+    ]);
+
+    const categories = categoryRows.map(r => {
+      const plain = r.get({ plain: true });
+      if (plain.payload && typeof plain.payload === 'object' && !Array.isArray(plain.payload)) {
+        const base = { ...(plain.payload as Record<string, unknown>) };
+        base.id = plain.sourceCategoryId;
+        return base as StoreApiProductCategory;
+      }
+      return {
+        id: plain.sourceCategoryId,
+        name: plain.name ?? '',
+        slug: plain.slug ?? '',
+        description: '',
+        parent: plain.parent ?? 0,
+        count: 0,
+        image: null,
+        review_count: 0,
+        permalink: '',
+      } as StoreApiProductCategory;
     });
 
+    return { supplier, categories, products: this._mapCatalogRows(catalogRows) };
+  }
+
+  private _mapCatalogRows(rows: InstanceType<typeof SupplierCatalogModel>[]): StoreApiProduct[] {
     return rows.map(r => {
       const plain = r.get({ plain: true });
       if (plain.payload && typeof plain.payload === 'object' && !Array.isArray(plain.payload)) {
@@ -192,12 +219,7 @@ class SupplierService {
         short_description: '',
         description: '',
         on_sale: false,
-        prices: {
-          price: '0',
-          regular_price: '0',
-          sale_price: '0',
-          currency_minor_unit: 0,
-        },
+        prices: { price: '0', regular_price: '0', sale_price: '0', currency_minor_unit: 0 },
         images: [],
         categories: [],
         tags: [],
@@ -206,10 +228,7 @@ class SupplierService {
     });
   }
 
-  public async syncSupplierCatalog(
-    supplierId: string,
-    userId: number,
-  ): Promise<{ fetched: number; upserted: number; removed: number }> {
+  public async syncSupplierCatalog(supplierId: string, userId: number): Promise<{ fetched: number; upserted: number; removed: number }> {
     const supplier = await this.findSupplierById(supplierId, userId);
     const sourceUrl = supplier.url && String(supplier.url).trim();
     if (!sourceUrl) {

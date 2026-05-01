@@ -32,92 +32,24 @@ type RawProduct = Record<string, unknown>;
 /* ------------------------------------------------------------------ */
 /*  Data fetchers                                                       */
 /* ------------------------------------------------------------------ */
-async function fetchSupplier(
+type SupplierFullResponse = {
+  supplier: Supplier;
+  categories: Category[];
+  products: unknown[];
+};
+
+async function fetchSupplierFull(
   id: string,
-): Promise<{ ok: true; supplier: Supplier } | { ok: false; status: number }> {
+): Promise<
+  { ok: true; data: SupplierFullResponse } | { ok: false; status: number }
+> {
   try {
-    const res = await backendFetch(`/suppliers/${id}`);
+    const res = await backendFetch(`/suppliers/${id}/full`, {}, 30);
     if (!res.ok) return { ok: false, status: res.status };
-    const json = (await res.json()) as { data: Supplier };
-    return { ok: true, supplier: json.data };
+    const json = (await res.json()) as { data: SupplierFullResponse };
+    return { ok: true, data: json.data };
   } catch {
     return { ok: false, status: 401 };
-  }
-}
-
-async function fetchCategories(
-  id: string,
-): Promise<{ ok: true; categories: Category[] } | { ok: false }> {
-  try {
-    const res = await backendFetch(`/suppliers/${id}/categories`);
-    if (!res.ok) return { ok: false };
-    const json = (await res.json()) as { data?: Category[] };
-    return { ok: true, categories: json.data ?? [] };
-  } catch {
-    return { ok: false };
-  }
-}
-
-function str(v: unknown): string | null {
-  if (typeof v === "string" && v.trim()) return v.trim();
-  if (typeof v === "number" && Number.isFinite(v)) return String(v);
-  return null;
-}
-
-async function fetchProducts(
-  id: string,
-): Promise<{ ok: true; products: ClientProduct[] } | { ok: false }> {
-  try {
-    const res = await backendFetch(`/suppliers/${id}/products`);
-    if (!res.ok) return { ok: false };
-    const json = (await res.json()) as { data?: unknown };
-    const arr = Array.isArray(json.data)
-      ? json.data
-      : Array.isArray((json as Record<string, unknown>).products)
-        ? (json as Record<string, unknown>).products
-        : [];
-
-    if (!Array.isArray(arr)) return { ok: true, products: [] };
-
-    const products: ClientProduct[] = [];
-    for (const row of arr) {
-      if (!row || typeof row !== "object") continue;
-      const o = row as RawProduct;
-      const merged: RawProduct =
-        o.product && typeof o.product === "object"
-          ? { ...(o.product as RawProduct), ...o }
-          : o;
-
-      const idRaw = merged.id;
-      const id =
-        typeof idRaw === "number"
-          ? idRaw
-          : typeof idRaw === "string"
-            ? Number(idRaw)
-            : NaN;
-      if (!Number.isFinite(id)) continue;
-
-      const categories = Array.isArray(merged.categories)
-        ? (merged.categories as { id: number }[])
-        : [];
-
-      let price: string | null = formatWooStorePriceFromFields(
-        merged.prices,
-        "sale_first",
-      );
-      let regularPrice: string | null = formatWooStorePriceFromFields(
-        merged.prices,
-        "regular_only",
-      );
-      if (!price) price = str(merged.price);
-      if (!regularPrice) regularPrice = str(merged.regular_price);
-
-      products.push({ id, price, regularPrice, categories });
-    }
-
-    return { ok: true, products };
-  } catch {
-    return { ok: false };
   }
 }
 
@@ -132,28 +64,80 @@ export default async function SupplierCategoriesPage({ params }: Props) {
   const locale = raw as Locale;
   const messages = getAppMessages(locale);
 
-  const [supplierResult, categoriesResult, productsResult] = await Promise.all([
-    fetchSupplier(id),
-    fetchCategories(id),
-    fetchProducts(id),
-  ]);
+  const fullResult = await fetchSupplierFull(id);
 
-  if (!supplierResult.ok) {
-    if (supplierResult.status === 401) {
+  if (!fullResult.ok) {
+    if (fullResult.status === 401) {
       redirect(`/${locale}/login?next=/${locale}/suppliers/${id}`);
     }
     notFound();
   }
 
-  const supplier = supplierResult.supplier;
-  const loadFailed = !categoriesResult.ok;
-  const categories = categoriesResult.ok ? categoriesResult.categories : [];
-  const products = productsResult.ok ? productsResult.products : [];
+  const { supplier, categories } = fullResult.data;
+  const rawProducts = fullResult.data.products;
+
+  /* Map raw products to ClientProduct */
+  const products: ClientProduct[] = [];
+  for (const row of rawProducts) {
+    if (!row || typeof row !== "object") continue;
+    const o = row as RawProduct;
+    const merged: RawProduct =
+      o.product && typeof o.product === "object"
+        ? { ...(o.product as RawProduct), ...o }
+        : o;
+
+    const idRaw = merged.id;
+    const productId =
+      typeof idRaw === "number"
+        ? idRaw
+        : typeof idRaw === "string"
+          ? Number(idRaw)
+          : NaN;
+    if (!Number.isFinite(productId)) continue;
+
+    const productCategories = Array.isArray(merged.categories)
+      ? (merged.categories as { id: number }[])
+      : [];
+
+    let price: string | null = formatWooStorePriceFromFields(
+      merged.prices,
+      "sale_first",
+    );
+    let regularPrice: string | null = formatWooStorePriceFromFields(
+      merged.prices,
+      "regular_only",
+    );
+    if (!price) {
+      const v = merged.price;
+      price =
+        typeof v === "string" && v.trim()
+          ? v.trim()
+          : typeof v === "number" && Number.isFinite(v)
+            ? String(v)
+            : null;
+    }
+    if (!regularPrice) {
+      const v = merged.regular_price;
+      regularPrice =
+        typeof v === "string" && v.trim()
+          ? v.trim()
+          : typeof v === "number" && Number.isFinite(v)
+            ? String(v)
+            : null;
+    }
+
+    products.push({
+      id: productId,
+      price,
+      regularPrice,
+      categories: productCategories,
+    });
+  }
 
   const nameById: Record<number, string> = {};
   for (const c of categories) nameById[c.id] = c.name;
 
-  /* Build children map for recursive count */
+  /* Build children map */
   const childrenByParent = new Map<number, Category[]>();
   for (const cat of categories) {
     const arr = childrenByParent.get(cat.parent) ?? [];
@@ -161,11 +145,15 @@ export default async function SupplierCategoriesPage({ params }: Props) {
     childrenByParent.set(cat.parent, arr);
   }
 
+  /* O(n) totalCount using a bottom-up Map instead of recursive .find */
+  const countById = new Map<number, number>(
+    categories.map((c) => [c.id, c.count ?? 0]),
+  );
   function totalCount(catId: number): number {
     const children = childrenByParent.get(catId) ?? [];
-    const self = categories.find((c) => c.id === catId)?.count ?? 0;
     return (
-      self + children.reduce((sum, child) => sum + totalCount(child.id), 0)
+      (countById.get(catId) ?? 0) +
+      children.reduce((sum, child) => sum + totalCount(child.id), 0)
     );
   }
 
@@ -175,6 +163,8 @@ export default async function SupplierCategoriesPage({ params }: Props) {
   for (const cat of rootCategories) {
     totalCountMap[cat.id] = totalCount(cat.id);
   }
+
+  const loadFailed = false;
 
   const clientCategories: ClientCategory[] = rootCategories.map((c) => ({
     id: c.id,
