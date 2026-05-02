@@ -1,4 +1,8 @@
 import nodeFetch from 'node-fetch';
+import * as path from 'path';
+import * as os from 'os';
+import * as fs from 'fs';
+import { spawn } from 'child_process';
 import { CreateSupplierDto } from '@dtos/suppliers.dto';
 import { HttpException } from '@exceptions/HttpException';
 import { col, fn, Op } from 'sequelize';
@@ -14,6 +18,8 @@ import {
   supplierProductSkusFromStoreApi,
 } from '@services/store-catalog.service';
 import { isEmpty } from '@utils/util';
+
+const SCRAPER_PATH = path.resolve(__dirname, '../scripts/woo_scraper.py');
 
 class SupplierService {
   public suppliers = SupplierModel;
@@ -126,7 +132,18 @@ class SupplierService {
       throw new HttpException(400, 'Supplier has no url; set the supplier catalog base URL');
     }
 
-    const categories = await fetchAllSupplierStoreApiProductCategories(sourceUrl);
+    let categories: StoreApiProductCategory[];
+    try {
+      categories = await fetchAllSupplierStoreApiProductCategories(sourceUrl);
+    } catch (e) {
+      const status = (e as HttpException).status;
+      if (status === 502 || status === 403 || status === 401) {
+        const result = await this.syncSupplierViaScraper(supplierId, userId, true);
+        return result.categories;
+      }
+      throw e;
+    }
+
     const sid = supplier.id;
     if (categories.length === 0) {
       const removed = await SupplierCategoryModel.destroy({ where: { supplierId: sid } });
@@ -263,7 +280,17 @@ class SupplierService {
       throw new HttpException(400, 'Supplier has no url; set the supplier catalog base URL');
     }
 
-    const products = await fetchAllSupplierStoreApiProducts(sourceUrl);
+    let products: StoreApiProduct[];
+    try {
+      products = await fetchAllSupplierStoreApiProducts(sourceUrl);
+    } catch (e) {
+      const status = (e as HttpException).status;
+      if (status === 502 || status === 403 || status === 401) {
+        const result = await this.syncSupplierViaScraper(supplierId, userId, false);
+        return result.products;
+      }
+      throw e;
+    }
     const sid = supplier.id;
     if (products.length === 0) {
       const removed = await SupplierCatalogModel.destroy({ where: { supplierId: sid } });
@@ -300,6 +327,138 @@ class SupplierService {
     }
 
     return { fetched: products.length, upserted, removed };
+  }
+
+  /** Run woo_scraper.py for the supplier URL and persist categories + products to the DB. */
+  public async syncSupplierViaScraper(
+    supplierId: string,
+    userId: number,
+    skipProducts = false,
+  ): Promise<{ categories: { fetched: number; upserted: number; removed: number }; products: { fetched: number; upserted: number; removed: number } }> {
+    const supplier = await this.findSupplierById(supplierId, userId);
+    const sourceUrl = supplier.url && String(supplier.url).trim();
+    if (!sourceUrl) {
+      throw new HttpException(400, 'Supplier has no url; set the supplier catalog base URL');
+    }
+
+    const sid = supplier.id;
+    const tmpDir = os.tmpdir();
+    const catsOut = path.join(tmpDir, `sc_cats_${sid}_${Date.now()}.json`);
+    const prodsOut = path.join(tmpDir, `sc_prods_${sid}_${Date.now()}.json`);
+
+    const args = [SCRAPER_PATH, sourceUrl, '--categories-out', catsOut, '--products-out', prodsOut];
+    if (skipProducts) args.push('--skip-products');
+
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawn('python3', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+      let stderr = '';
+      proc.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
+      proc.stdout.on('data', () => { /* suppress */ });
+      proc.on('close', code => {
+        if (code !== 0) reject(new Error(`woo_scraper.py exited with code ${code}: ${stderr.slice(0, 500)}`));
+        else resolve();
+      });
+      proc.on('error', reject);
+    });
+
+    // ── Categories ──────────────────────────────────────────────────────────
+    type ScraperCategory = { id: number; name: string; slug: string; parent: number; count: number; permalink: string; description: string; source: string };
+    let scraperCats: ScraperCategory[] = [];
+    try {
+      scraperCats = JSON.parse(fs.readFileSync(catsOut, 'utf-8'));
+    } catch { /* file may not exist if scraper found nothing */ }
+    finally { try { fs.unlinkSync(catsOut); } catch { /* ignore */ } }
+
+    let catsUpserted = 0;
+    const fetchedCatIds: number[] = [];
+    for (const cat of scraperCats) {
+      if (!cat.id) continue;
+      // Sitemap strategy uses negative synthetic IDs — convert to positive for UNSIGNED column
+      const sourceCategoryId = cat.id < 0 ? Math.abs(cat.id) : cat.id;
+      fetchedCatIds.push(sourceCategoryId);
+      const payload: StoreApiProductCategory = {
+        id: sourceCategoryId, name: cat.name, slug: cat.slug,
+        description: cat.description ?? '',
+        parent: cat.parent ?? 0, count: cat.count ?? 0,
+        image: null, review_count: 0, permalink: cat.permalink ?? '',
+      };
+      await SupplierCategoryModel.upsert({
+        supplierId: sid,
+        sourceCategoryId,
+        parent: cat.parent ?? null,
+        name: cat.name ?? '',
+        slug: cat.slug ?? '',
+        payload: payload as object,
+      });
+      catsUpserted += 1;
+    }
+    const catsRemoved = await SupplierCategoryModel.destroy({
+      where: { supplierId: sid, ...(fetchedCatIds.length > 0 ? { sourceCategoryId: { [Op.notIn]: fetchedCatIds } } : {}) },
+    });
+
+    // ── Products ────────────────────────────────────────────────────────────
+    type ScraperProduct = {
+      id: number; name: string; sku: string;
+      price: string; regular_price: string; sale_price: string;
+      description: string; short_description: string;
+      categories: number[]; image_urls: string[];
+      in_stock: boolean; on_sale: boolean; source: string;
+    };
+    let scraperProds: ScraperProduct[] = [];
+    if (!skipProducts) {
+      try {
+        scraperProds = JSON.parse(fs.readFileSync(prodsOut, 'utf-8'));
+      } catch { /* file may not exist */ }
+      finally { try { fs.unlinkSync(prodsOut); } catch { /* ignore */ } }
+    }
+
+    let prodsUpserted = 0;
+    let prodsRemoved = 0;
+    const fetchedProdIds: number[] = [];
+
+    if (!skipProducts) {
+      for (const prod of scraperProds) {
+        if (!prod.id) continue;
+        fetchedProdIds.push(prod.id);
+
+        const storeApiProduct: StoreApiProduct = {
+          id: prod.id,
+          name: prod.name ?? '',
+          slug: prod.sku ? prod.sku : String(prod.id),
+          type: 'simple',
+          sku: prod.sku ?? '',
+          short_description: prod.short_description ?? '',
+          description: prod.description ?? '',
+          on_sale: prod.on_sale ?? false,
+          prices: { price: prod.price ?? '0', regular_price: prod.regular_price ?? '0', sale_price: prod.sale_price ?? '0', currency_minor_unit: 0 },
+          images: (prod.image_urls ?? []).map((src: string) => ({ src })),
+          categories: (prod.categories ?? []).map((id: number) => ({ id, name: '', slug: '' })),
+          tags: [],
+          is_in_stock: prod.in_stock ?? true,
+        };
+
+        const { skuOriginal, sku } = supplierProductSkusFromStoreApi(storeApiProduct);
+        await SupplierCatalogModel.upsert({
+          supplierId: sid,
+          sourceProductId: prod.id,
+          skuOriginal,
+          sku,
+          name: prod.name ?? null,
+          payload: storeApiProduct as object,
+          categories: (prod.categories ?? []).map(String),
+        });
+        prodsUpserted += 1;
+      }
+
+      prodsRemoved = await SupplierCatalogModel.destroy({
+        where: { supplierId: sid, ...(fetchedProdIds.length > 0 ? { sourceProductId: { [Op.notIn]: fetchedProdIds } } : {}) },
+      });
+    }
+
+    return {
+      categories: { fetched: scraperCats.length, upserted: catsUpserted, removed: catsRemoved },
+      products: { fetched: scraperProds.length, upserted: prodsUpserted, removed: prodsRemoved },
+    };
   }
 
   public async findSupplierById(supplierId: string, userId: number): Promise<Supplier> {

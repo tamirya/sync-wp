@@ -77,6 +77,17 @@ class SuppliersController {
     }
   };
 
+  public syncSupplierViaScraper = async (req: RequestWithUser, res: Response, next: NextFunction) => {
+    try {
+      const supplierId: string = req.params.id;
+      const skipProducts = req.query.skipProducts === 'true';
+      const data = await this.supplierService.syncSupplierViaScraper(supplierId, req.user.id, skipProducts);
+      res.status(200).json({ data, message: 'scraperSynced' });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   public getSupplierLogo = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
       const supplierId: string = req.params.id;
