@@ -18,6 +18,7 @@ type LoadedProduct = {
   short_description: string;
   status: string;
   manage_stock: boolean;
+  stock_status: string;
   stock_quantity: string;
   image_url: string;
 };
@@ -53,6 +54,7 @@ function parseProduct(raw: RawWooProduct): LoadedProduct {
     short_description: str(product.short_description),
     status: str(product.status) || "publish",
     manage_stock: product.manage_stock === true,
+    stock_status: str(product.stock_status) || "instock",
     stock_quantity:
       product.stock_quantity != null ? str(product.stock_quantity) : "",
     image_url: Array.isArray(product.images)

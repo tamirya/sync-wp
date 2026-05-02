@@ -29,6 +29,10 @@ export type ProductFormMessages = {
   fieldStatusDraft: string;
   fieldStatusPrivate: string;
   fieldManageStock: string;
+  fieldManageStockHint: string;
+  fieldStockStatus: string;
+  fieldStockStatusInStock: string;
+  fieldStockStatusOutOfStock: string;
   fieldStockQuantity: string;
   fieldStockQuantityPlaceholder: string;
   submitEdit: string;
@@ -69,6 +73,10 @@ const he: ProductFormMessages = {
   fieldStatusDraft: "טיוטה",
   fieldStatusPrivate: "פרטי",
   fieldManageStock: "ניהול מלאי",
+  fieldManageStockHint: "לעקוב אחרי הכמות של המוצר במלאי",
+  fieldStockStatus: "מצב מלאי",
+  fieldStockStatusInStock: "קיים במלאי",
+  fieldStockStatusOutOfStock: "המלאי אזל",
   fieldStockQuantity: "כמות במלאי",
   fieldStockQuantityPlaceholder: "0",
   submitEdit: "שמור שינויים",
@@ -109,6 +117,10 @@ const en: ProductFormMessages = {
   fieldStatusDraft: "Draft",
   fieldStatusPrivate: "Private",
   fieldManageStock: "Manage stock",
+  fieldManageStockHint: "Track the product quantity in inventory",
+  fieldStockStatus: "Stock status",
+  fieldStockStatusInStock: "In stock",
+  fieldStockStatusOutOfStock: "Out of stock",
   fieldStockQuantity: "Stock quantity",
   fieldStockQuantityPlaceholder: "0",
   submitEdit: "Save changes",

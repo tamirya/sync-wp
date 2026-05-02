@@ -38,11 +38,11 @@ async function readApiError(res: Response): Promise<string> {
   }
 }
 
-/** Direct WooCommerce call to update product images (bypasses backend DTO) */
-async function updateProductImage(
+/** Direct WooCommerce call — bypasses backend DTO for fields it doesn't expose */
+async function updateProductDirect(
   storeId: string,
   wooProductId: string,
-  imageUrl: string,
+  payload: Record<string, unknown>,
 ) {
   const storeData = await fetchStoreEditData(storeId);
   if (!storeData.ok) return;
@@ -70,12 +70,10 @@ async function updateProductImage(
         Authorization: `Basic ${auth}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        images: imageUrl ? [{ src: imageUrl }] : [],
-      }),
+      body: JSON.stringify(payload),
     });
   } catch {
-    /* image update is best-effort — don't block the redirect */
+    /* best-effort — don't block the redirect */
   }
 }
 
@@ -102,6 +100,7 @@ export async function updateProductAction(
   ).trim();
   const status = String(formData.get("status") ?? "publish").trim();
   const manage_stock = formData.get("manage_stock") === "on";
+  const stock_status = String(formData.get("stock_status") ?? "instock").trim();
   const stock_quantity_raw = String(
     formData.get("stock_quantity") ?? "",
   ).trim();
@@ -118,7 +117,7 @@ export async function updateProductAction(
     name,
     ...(sku ? { sku } : {}),
     ...(regular_price ? { regular_price } : {}),
-    ...(sale_price !== "" ? { sale_price } : {}),
+    sale_price: sale_price !== "" ? sale_price : regular_price,
     ...(description ? { description } : {}),
     ...(short_description ? { short_description } : {}),
     status,
@@ -145,9 +144,15 @@ export async function updateProductAction(
     };
   }
 
-  /* Image update — direct WooCommerce call (bypasses backend DTO restriction) */
-  await updateProductImage(storeId, wooProductId, image_url);
+  /* Direct WooCommerce call — bypasses backend DTO restriction */
+  const directPayload: Record<string, unknown> = {
+    ...(image_url !== undefined
+      ? { images: image_url ? [{ src: image_url }] : [] }
+      : {}),
+    ...(!manage_stock ? { stock_status } : {}),
+  };
+  await updateProductDirect(storeId, wooProductId, directPayload);
 
   revalidatePath(`/${locale}/stores/${storeId}`);
-  redirect(`/${locale}/stores/${storeId}`);
+  return { success: true, message: m.successMessage };
 }

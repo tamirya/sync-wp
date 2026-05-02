@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { Locale } from "@/i18n/config";
@@ -493,6 +493,26 @@ function ImageField({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Inventory row (two-column label + control layout)                  */
+/* ------------------------------------------------------------------ */
+function InventoryRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="grid grid-cols-[minmax(7rem,auto)_1fr] items-start gap-x-4 border-b border-border/40 py-3 last:border-b-0">
+      <span className="pt-0.5 text-sm font-semibold text-foreground">
+        {label}
+      </span>
+      <div>{children}</div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Initial values type                                                 */
 /* ------------------------------------------------------------------ */
 export type ProductFormInitial = {
@@ -504,6 +524,7 @@ export type ProductFormInitial = {
   short_description: string;
   status: string;
   manage_stock: boolean;
+  stock_status: string;
   stock_quantity: string;
   image_url: string;
 };
@@ -527,6 +548,7 @@ export function ProductEditForm({
   initial,
 }: Props) {
   const dir = locale === "he" ? "rtl" : "ltr";
+  const router = useRouter();
 
   const [values, setValues] = useState<ProductFormInitial>({ ...initial });
   const [dismissed, setDismissed] = useState<
@@ -544,6 +566,7 @@ export function ProductEditForm({
     initial.short_description,
     initial.status,
     initial.manage_stock,
+    initial.stock_status,
     initial.stock_quantity,
     initial.image_url,
   ]);
@@ -555,7 +578,7 @@ export function ProductEditForm({
 
   useEffect(() => {
     setDismissed({});
-  }, [state]);
+  }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function fieldError(f: ProductFormField): string | undefined {
     if (dismissed[f]) return undefined;
@@ -581,14 +604,16 @@ export function ProductEditForm({
     if (sf) setDismissed((d) => ({ ...d, [sf]: true }));
   }
 
-  const showBanner = Boolean(state?.message);
+  const showError = Boolean(state?.message && !state?.success);
+  const showSuccess = Boolean(state?.success);
 
   return (
     <div className="pb-12" dir={dir}>
       {/* ── Header ── */}
       <div className="mb-8 flex flex-col gap-1">
-        <Link
-          href={`/${locale}/stores/${storeId}`}
+        <button
+          type="button"
+          onClick={() => router.back()}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-primary transition-colors"
         >
           <svg
@@ -606,7 +631,7 @@ export function ProductEditForm({
             />
           </svg>
           {messages.back}
-        </Link>
+        </button>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">
           {values.name || messages.editTitle}
         </h1>
@@ -704,34 +729,81 @@ export function ProductEditForm({
                 <option value="private">{messages.fieldStatusPrivate}</option>
               </SelectRow>
 
-              <label className="flex cursor-pointer items-center gap-2.5">
-                <input
-                  type="checkbox"
-                  name="manage_stock"
-                  checked={values.manage_stock}
-                  onChange={(e) => patch("manage_stock", e.target.checked)}
-                  className="h-4 w-4 accent-primary"
-                />
-                <span className="text-sm font-semibold text-foreground">
-                  {messages.fieldManageStock}
-                </span>
-              </label>
+              <div className="mt-1 rounded-xl border border-border/60 px-4 py-1">
+                <InventoryRow label={messages.fieldManageStock}>
+                  <label className="flex cursor-pointer items-center gap-2.5">
+                    <input
+                      type="checkbox"
+                      name="manage_stock"
+                      checked={values.manage_stock}
+                      onChange={(e) => patch("manage_stock", e.target.checked)}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    <span className="text-sm text-foreground">
+                      {messages.fieldManageStockHint}
+                    </span>
+                  </label>
+                </InventoryRow>
 
-              {values.manage_stock && (
-                <FieldRow
-                  id="pf-stock-qty"
-                  name="stock_quantity"
-                  type="number"
-                  label={messages.fieldStockQuantity}
-                  placeholder={messages.fieldStockQuantityPlaceholder}
-                  value={values.stock_quantity}
-                  onChange={(v) => patch("stock_quantity", v)}
-                />
-              )}
+                {values.manage_stock ? (
+                  <InventoryRow label={messages.fieldStockQuantity}>
+                    <input
+                      id="pf-stock-qty"
+                      name="stock_quantity"
+                      type="number"
+                      placeholder={messages.fieldStockQuantityPlaceholder}
+                      value={values.stock_quantity}
+                      onChange={(e) => patch("stock_quantity", e.target.value)}
+                      className="w-full rounded-xl border border-border/70 bg-muted-bg/60 px-3.5 py-2 text-sm text-foreground outline-none transition placeholder:text-muted focus:border-ring focus:ring-2 focus:ring-ring/20"
+                    />
+                  </InventoryRow>
+                ) : (
+                  <InventoryRow label={messages.fieldStockStatus}>
+                    <div className="flex flex-col gap-2">
+                      <label className="flex cursor-pointer items-center gap-2.5">
+                        <input
+                          type="radio"
+                          name="stock_status"
+                          value="instock"
+                          checked={values.stock_status === "instock"}
+                          onChange={() => patch("stock_status", "instock")}
+                          className="h-4 w-4 accent-primary"
+                        />
+                        <span className="text-sm text-foreground">
+                          {messages.fieldStockStatusInStock}
+                        </span>
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2.5">
+                        <input
+                          type="radio"
+                          name="stock_status"
+                          value="outofstock"
+                          checked={values.stock_status === "outofstock"}
+                          onChange={() => patch("stock_status", "outofstock")}
+                          className="h-4 w-4 accent-primary"
+                        />
+                        <span className="text-sm text-foreground">
+                          {messages.fieldStockStatusOutOfStock}
+                        </span>
+                      </label>
+                    </div>
+                  </InventoryRow>
+                )}
+              </div>
             </SectionCard>
 
+            {/* Success banner */}
+            {showSuccess && (
+              <p
+                className="rounded-xl border border-green-300 bg-green-50 px-4 py-3 text-sm font-medium text-green-700"
+                role="status"
+              >
+                {state?.message}
+              </p>
+            )}
+
             {/* Error banner */}
-            {showBanner && (
+            {showError && (
               <p
                 className="rounded-xl border border-destructive/35 bg-destructive-muted px-4 py-3 text-sm text-destructive"
                 role="alert"

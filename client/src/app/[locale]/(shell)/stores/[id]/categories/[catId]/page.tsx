@@ -16,6 +16,7 @@ type RawProduct = Record<string, unknown>;
 
 type ParsedProduct = {
   id: number;
+  wooProductId: number;
   name: string;
   sku: string;
   price: string | null;
@@ -54,10 +55,11 @@ function parseWooProducts(data: unknown): ParsedProduct[] {
   for (const row of data) {
     if (!row || typeof row !== "object") continue;
     const o = row as RawProduct;
-    const merged: RawProduct =
+    const innerProduct =
       o.product && typeof o.product === "object"
-        ? { ...(o.product as RawProduct), ...o }
-        : o;
+        ? (o.product as RawProduct)
+        : null;
+    const merged: RawProduct = innerProduct ? { ...innerProduct, ...o } : o;
 
     const idRaw = merged.id;
     const id =
@@ -67,6 +69,15 @@ function parseWooProducts(data: unknown): ParsedProduct[] {
           ? Number(idRaw)
           : NaN;
     if (!Number.isFinite(id)) continue;
+
+    /* WooCommerce product ID — lives in the nested product object */
+    const wooIdRaw = innerProduct?.id ?? idRaw;
+    const wooProductId =
+      typeof wooIdRaw === "number"
+        ? wooIdRaw
+        : typeof wooIdRaw === "string"
+          ? Number(wooIdRaw)
+          : id;
 
     const images = Array.isArray(merged.images)
       ? (merged.images as WooImage[])
@@ -101,6 +112,7 @@ function parseWooProducts(data: unknown): ParsedProduct[] {
 
     out.push({
       id,
+      wooProductId,
       name: str(merged.name) ?? `#${id}`,
       sku: str(merged.sku) ?? "",
       price,
@@ -263,10 +275,10 @@ function ProductCard({
             {hasSale ? (
               <>
                 <span className="text-base font-bold text-primary">
-                  {product.salePrice}
+                  {product.salePrice} ש״ח
                 </span>
                 <span className="text-sm text-muted line-through">
-                  {product.regularPrice}
+                  {product.regularPrice} ש״ח
                 </span>
                 <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
                   {messages.storeProductSalePrice}
@@ -274,7 +286,7 @@ function ProductCard({
               </>
             ) : (
               <span className="text-base font-bold text-card-foreground">
-                {product.price ?? product.regularPrice}
+                {product.price ?? product.regularPrice} ש״ח
               </span>
             )}
           </div>
@@ -284,7 +296,7 @@ function ProductCard({
         <div className="mt-auto flex items-center justify-between gap-2">
           <StockBadge status={product.stockStatus} messages={messages} />
           <Link
-            href={`/${locale}/stores/${storeId}/products/${product.id}/edit`}
+            href={`/${locale}/stores/${storeId}/products/${product.wooProductId}/edit`}
             className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm transition hover:bg-muted-bg hover:border-primary/40 hover:text-primary"
           >
             <svg
