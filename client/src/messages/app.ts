@@ -128,6 +128,23 @@ export type AppMessages = {
   syncSupplierProducts: string;
   syncSupplierCategories: string;
   syncSupplier: string;
+  supplierSyncing: string;
+  priceOverrideButton: string;
+  priceOverrideModalTitle: string;
+  priceOverrideSupplierPrice: string;
+  priceOverrideSupplierPriceMin: string;
+  priceOverrideIncludeSalePrices: string;
+  priceOverrideLoadingBase: string;
+  priceOverrideNoBasePrice: string;
+  priceOverrideMarkupLabel: string;
+  priceOverridePreviewLabel: string;
+  priceOverrideMarkup10: string;
+  priceOverrideMarkup20: string;
+  priceOverrideSave: string;
+  priceOverrideCancel: string;
+  priceOverrideSaving: string;
+  priceOverrideSaved: string;
+  priceOverrideError: string;
   syncSuccessAlert: string;
   syncFailedAlert: string;
   clearWooProducts: string;
@@ -200,6 +217,7 @@ export type AppMessages = {
   syncModalCreateRule: string;
   syncModalSuccess: string;
   syncModalError: string;
+  syncModalDuplicateRuleError: string;
   syncModalLoadingStores: string;
   syncModalLoadingCategories: string;
   syncModalNoStores: string;
@@ -326,6 +344,23 @@ const he: AppMessages = {
   syncSupplierProducts: "סנכרן מוצרים",
   syncSupplierCategories: "סנכרן קטגוריות",
   syncSupplier: "סנכרון",
+  supplierSyncing: "מסנכרן…",
+  priceOverrideButton: "שנה מחיר",
+  priceOverrideModalTitle: "קביעת תוספת מחיר",
+  priceOverrideSupplierPrice: "מחיר ספק",
+  priceOverrideSupplierPriceMin: "מחיר ספק (מינימום בקטגוריה)",
+  priceOverrideIncludeSalePrices: "כלול מחירי מבצע של הספק",
+  priceOverrideLoadingBase: "טוען מחירי קטגוריה…",
+  priceOverrideNoBasePrice: "לא נמצא מחיר בספק",
+  priceOverrideMarkupLabel: "תוספת מחיר",
+  priceOverridePreviewLabel: "דוגמה (מינימום)",
+  priceOverrideMarkup10: "+10%",
+  priceOverrideMarkup20: "+20%",
+  priceOverrideSave: "שמירה",
+  priceOverrideCancel: "ביטול",
+  priceOverrideSaving: "שומר…",
+  priceOverrideSaved: "נשמר",
+  priceOverrideError: "שגיאה בשמירה",
   syncSuccessAlert: "הסנכרון הושלם בהצלחה",
   syncFailedAlert: "הסנכרון נכשל:",
   clearWooProducts: "מחיקת כל המוצרים מהחנות",
@@ -401,7 +436,8 @@ const he: AppMessages = {
   syncModalSelectCategory: "בחר קטגוריה יעד",
   syncModalCreateRule: "צור כלל",
   syncModalSuccess: "הכלל נוצר בהצלחה!",
-  syncModalError: "שגיאה:",
+  syncModalError: "יצירת הכלל נכשלה. אנא נסה שנית.",
+  syncModalDuplicateRuleError: "כלל זהה כבר קיים עבור חנות, ספק ומוצר אלו.",
   syncModalLoadingStores: "טוען חנויות...",
   syncModalLoadingCategories: "טוען קטגוריות...",
   syncModalNoStores: "אין חנויות",
@@ -531,6 +567,23 @@ const en: AppMessages = {
   syncSupplierProducts: "Sync products",
   syncSupplierCategories: "Sync categories",
   syncSupplier: "Sync",
+  supplierSyncing: "Syncing…",
+  priceOverrideButton: "Change price",
+  priceOverrideModalTitle: "Set markup",
+  priceOverrideSupplierPrice: "Supplier price",
+  priceOverrideSupplierPriceMin: "Supplier price (category min)",
+  priceOverrideIncludeSalePrices: "Include supplier sale prices",
+  priceOverrideLoadingBase: "Loading category prices…",
+  priceOverrideNoBasePrice: "No supplier price found",
+  priceOverrideMarkupLabel: "Markup",
+  priceOverridePreviewLabel: "Preview (minimum)",
+  priceOverrideMarkup10: "+10%",
+  priceOverrideMarkup20: "+20%",
+  priceOverrideSave: "Save",
+  priceOverrideCancel: "Cancel",
+  priceOverrideSaving: "Saving…",
+  priceOverrideSaved: "Saved",
+  priceOverrideError: "Save failed",
   syncSuccessAlert: "Sync completed successfully",
   syncFailedAlert: "Sync failed:",
   clearWooProducts: "Delete all products from store",
@@ -607,7 +660,8 @@ const en: AppMessages = {
   syncModalSelectCategory: "Select target category",
   syncModalCreateRule: "Create rule",
   syncModalSuccess: "Rule created successfully!",
-  syncModalError: "Error:",
+  syncModalError: "Failed to create rule. Please try again.",
+  syncModalDuplicateRuleError: "A rule for this store, supplier and product already exists.",
   syncModalLoadingStores: "Loading stores...",
   syncModalLoadingCategories: "Loading categories...",
   syncModalNoStores: "No stores found",
@@ -616,4 +670,25 @@ const en: AppMessages = {
 
 export function getAppMessages(locale: Locale): AppMessages {
   return locale === "en" ? en : he;
+}
+
+/** Subset of app messages for {@link import("@/components/price-override-modal").PriceOverrideModal}. */
+export function pickPriceOverrideMessages(m: AppMessages) {
+  return {
+    priceOverrideModalTitle: m.priceOverrideModalTitle,
+    priceOverrideSupplierPrice: m.priceOverrideSupplierPrice,
+    priceOverrideSupplierPriceMin: m.priceOverrideSupplierPriceMin,
+    priceOverrideIncludeSalePrices: m.priceOverrideIncludeSalePrices,
+    priceOverrideLoadingBase: m.priceOverrideLoadingBase,
+    priceOverrideNoBasePrice: m.priceOverrideNoBasePrice,
+    priceOverrideMarkupLabel: m.priceOverrideMarkupLabel,
+    priceOverridePreviewLabel: m.priceOverridePreviewLabel,
+    priceOverrideMarkup10: m.priceOverrideMarkup10,
+    priceOverrideMarkup20: m.priceOverrideMarkup20,
+    priceOverrideSave: m.priceOverrideSave,
+    priceOverrideCancel: m.priceOverrideCancel,
+    priceOverrideSaving: m.priceOverrideSaving,
+    priceOverrideSaved: m.priceOverrideSaved,
+    priceOverrideError: m.priceOverrideError,
+  };
 }

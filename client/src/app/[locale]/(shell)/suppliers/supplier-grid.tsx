@@ -9,6 +9,7 @@ import {
 } from "@/app/actions/sync-supplier";
 import type { Locale } from "@/i18n/config";
 import type { SupplierCardData } from "@/lib/suppliers-api";
+import type { ActiveSupplierJobsMap } from "@/lib/jobs-api";
 import type { AppMessages } from "@/messages/app";
 
 export type { SupplierCardData };
@@ -17,6 +18,7 @@ type Props = {
   locale: Locale;
   messages: AppMessages;
   suppliers: SupplierCardData[];
+  activeJobsBySupplierId: ActiveSupplierJobsMap;
 };
 
 function formatSynced(iso: string | null, locale: Locale) {
@@ -110,19 +112,42 @@ function MenuItem({
 /* ------------------------------------------------------------------ */
 /*  Supplier card                                                        */
 /* ------------------------------------------------------------------ */
+type SyncJobStatus = "idle" | "running" | "done" | "failed";
+
+type JobStatusResponse = {
+  data?: { status?: string; error?: string | null };
+};
+
+async function pollJobStatus(jobId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/jobs/${jobId}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = (await res.json()) as JobStatusResponse;
+    return json.data?.status ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function SupplierCardItem({
   supplier,
   locale,
   messages,
+  initialJobIds,
 }: {
   supplier: SupplierCardData;
   locale: Locale;
   messages: AppMessages;
+  initialJobIds: string[];
 }) {
   const router = useRouter();
   const [syncPending, startSyncTransition] = useTransition();
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [syncJobIds, setSyncJobIds] = useState<string[]>(initialJobIds);
+  const [syncStatus, setSyncStatus] = useState<SyncJobStatus>(
+    initialJobIds.length > 0 ? "running" : "idle",
+  );
 
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -138,25 +163,54 @@ function SupplierCardItem({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menuOpen]);
 
-  const anyPending = syncPending;
+  /* Poll job statuses until all complete */
+  useEffect(() => {
+    if (syncJobIds.length === 0 || syncStatus !== "running") return;
+
+    const interval = setInterval(async () => {
+      const statuses = await Promise.all(syncJobIds.map(pollJobStatus));
+      const hasFailed = statuses.some((s) => s === "failed");
+      const allDone = statuses.every((s) => s === "done" || s === "failed");
+
+      if (hasFailed) {
+        setSyncStatus("failed");
+        setSyncJobIds([]);
+        window.alert(messages.syncFailedAlert);
+      } else if (allDone) {
+        setSyncStatus("done");
+        setSyncJobIds([]);
+        router.refresh();
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [syncJobIds, syncStatus, router, messages.syncFailedAlert]);
+
+  const isSyncing = syncPending || syncStatus === "running";
+  const anyPending = isSyncing;
 
   function executeSync() {
     setMenuOpen(false);
+    setSyncStatus("idle");
     startSyncTransition(async () => {
-      const rProducts = await syncSupplierProductsAction(locale, supplier.id);
+      const [rProducts, rCategories] = await Promise.all([
+        syncSupplierProductsAction(locale, supplier.id),
+        syncSupplierCategoriesAction(locale, supplier.id),
+      ]);
+
       if (!rProducts.ok) {
         window.alert(`${messages.syncFailedAlert} ${rProducts.message}`);
+        setSyncStatus("failed");
         return;
       }
-      const rCategories = await syncSupplierCategoriesAction(
-        locale,
-        supplier.id,
-      );
       if (!rCategories.ok) {
         window.alert(`${messages.syncFailedAlert} ${rCategories.message}`);
+        setSyncStatus("failed");
         return;
       }
-      router.refresh();
+
+      setSyncJobIds([rProducts.jobId, rCategories.jobId]);
+      setSyncStatus("running");
     });
   }
 
@@ -191,7 +245,7 @@ function SupplierCardItem({
 
   return (
     <>
-      <article className="group flex flex-col rounded-[var(--radius-card)] border border-border/80 bg-card p-0 shadow-[var(--shadow-card)] transition-all duration-200 hover:shadow-[var(--shadow-card-hover)] hover:border-primary/40 hover:-translate-y-0.5">
+      <article className="group flex flex-col rounded-[var(--radius-card)] border border-border/80 bg-card p-0 shadow-[var(--shadow-card)] transition-all duration-200 hover:shadow-[var(--shadow-card-hover)] hover:border-primary/40">
         <div className="flex flex-col gap-4 p-6 pb-5">
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
@@ -222,11 +276,16 @@ function SupplierCardItem({
             </Link>
 
             <div className="flex shrink-0 items-center gap-2">
-              {supplier.synced && (
+              {isSyncing ? (
+                <span className="flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-primary">
+                  <Spinner className="h-3 w-3" />
+                  {messages.supplierSyncing}
+                </span>
+              ) : syncStatus === "done" || supplier.synced ? (
                 <span className="rounded-full bg-success-muted px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-success">
                   {messages.supplierStatusOk}
                 </span>
-              )}
+              ) : null}
 
               {/* Actions menu trigger */}
               <div className="relative" ref={menuRef}>
@@ -317,7 +376,12 @@ function SupplierCardItem({
 /* ------------------------------------------------------------------ */
 /*  Grid                                                                 */
 /* ------------------------------------------------------------------ */
-export function SupplierGrid({ locale, messages, suppliers }: Props) {
+export function SupplierGrid({
+  locale,
+  messages,
+  suppliers,
+  activeJobsBySupplierId,
+}: Props) {
   return (
     <div className="mt-10 grid auto-rows-fr gap-6 lg:grid-cols-2 xl:max-w-5xl">
       {suppliers.map((supplier) => (
@@ -326,6 +390,7 @@ export function SupplierGrid({ locale, messages, suppliers }: Props) {
           supplier={supplier}
           locale={locale}
           messages={messages}
+          initialJobIds={activeJobsBySupplierId[supplier.id] ?? []}
         />
       ))}
 

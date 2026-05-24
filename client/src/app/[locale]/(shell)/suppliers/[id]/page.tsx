@@ -2,8 +2,7 @@ import Link from "next/link";
 import { isLocale, type Locale } from "@/i18n/config";
 import { notFound, redirect } from "next/navigation";
 import { backendFetch } from "@/lib/backend-fetch";
-import { getAppMessages } from "@/messages/app";
-import { formatWooStorePriceFromFields } from "@/lib/mapping-tree-utils";
+import { getAppMessages, pickPriceOverrideMessages } from "@/messages/app";
 import {
   SupplierCategoriesClient,
   type ClientCategory,
@@ -27,26 +26,23 @@ type Category = {
   images?: CategoryImage[] | null;
 };
 
-type RawProduct = Record<string, unknown>;
-
 /* ------------------------------------------------------------------ */
 /*  Data fetchers                                                       */
 /* ------------------------------------------------------------------ */
-type SupplierFullResponse = {
+type SupplierWithCategoriesResponse = {
   supplier: Supplier;
   categories: Category[];
-  products: unknown[];
 };
 
-async function fetchSupplierFull(
+async function fetchSupplierWithCategories(
   id: string,
 ): Promise<
-  { ok: true; data: SupplierFullResponse } | { ok: false; status: number }
+  { ok: true; data: SupplierWithCategoriesResponse } | { ok: false; status: number }
 > {
   try {
-    const res = await backendFetch(`/suppliers/${id}/full`, {}, 30);
+    const res = await backendFetch(`/suppliers/${id}/with-categories`);
     if (!res.ok) return { ok: false, status: res.status };
-    const json = (await res.json()) as { data: SupplierFullResponse };
+    const json = (await res.json()) as { data: SupplierWithCategoriesResponse };
     return { ok: true, data: json.data };
   } catch {
     return { ok: false, status: 401 };
@@ -75,9 +71,42 @@ export default async function SupplierCategoriesPage({ params }: Props) {
   const locale = raw as Locale;
   const messages = getAppMessages(locale);
 
-  const [fullResult, logoUrl] = await Promise.all([
-    fetchSupplierFull(id),
+  async function fetchCategoryOverrides(
+    supplierId: string,
+  ): Promise<
+    Map<number, { markupPercent: number; useSalePrices: boolean }>
+  > {
+    const map = new Map<
+      number,
+      { markupPercent: number; useSalePrices: boolean }
+    >();
+    try {
+      const res = await backendFetch(`/suppliers/${supplierId}/price-overrides`);
+      if (!res.ok) return map;
+      const json = (await res.json()) as {
+        data?: Array<{
+          type: string;
+          targetId: number;
+          markupPercent: number;
+          useSalePrices: boolean;
+        }>;
+      };
+      for (const o of json.data ?? []) {
+        if (o.type === "category") {
+          map.set(o.targetId, {
+            markupPercent: Number(o.markupPercent),
+            useSalePrices: o.useSalePrices !== false,
+          });
+        }
+      }
+    } catch {}
+    return map;
+  }
+
+  const [fullResult, logoUrl, categoryOverrideMap] = await Promise.all([
+    fetchSupplierWithCategories(id),
     fetchSupplierLogo(id),
+    fetchCategoryOverrides(id),
   ]);
 
   if (!fullResult.ok) {
@@ -88,65 +117,8 @@ export default async function SupplierCategoriesPage({ params }: Props) {
   }
 
   const { supplier, categories } = fullResult.data;
-  const rawProducts = fullResult.data.products;
-
-  /* Map raw products to ClientProduct */
+  // Products not loaded on this page — only categories are needed for the grid
   const products: ClientProduct[] = [];
-  for (const row of rawProducts) {
-    if (!row || typeof row !== "object") continue;
-    const o = row as RawProduct;
-    const merged: RawProduct =
-      o.product && typeof o.product === "object"
-        ? { ...(o.product as RawProduct), ...o }
-        : o;
-
-    const idRaw = merged.id;
-    const productId =
-      typeof idRaw === "number"
-        ? idRaw
-        : typeof idRaw === "string"
-          ? Number(idRaw)
-          : NaN;
-    if (!Number.isFinite(productId)) continue;
-
-    const productCategories = Array.isArray(merged.categories)
-      ? (merged.categories as { id: number }[])
-      : [];
-
-    let price: string | null = formatWooStorePriceFromFields(
-      merged.prices,
-      "sale_first",
-    );
-    let regularPrice: string | null = formatWooStorePriceFromFields(
-      merged.prices,
-      "regular_only",
-    );
-    if (!price) {
-      const v = merged.price;
-      price =
-        typeof v === "string" && v.trim()
-          ? v.trim()
-          : typeof v === "number" && Number.isFinite(v)
-            ? String(v)
-            : null;
-    }
-    if (!regularPrice) {
-      const v = merged.regular_price;
-      regularPrice =
-        typeof v === "string" && v.trim()
-          ? v.trim()
-          : typeof v === "number" && Number.isFinite(v)
-            ? String(v)
-            : null;
-    }
-
-    products.push({
-      id: productId,
-      price,
-      regularPrice,
-      categories: productCategories,
-    });
-  }
 
   const nameById: Record<number, string> = {};
   for (const c of categories) nameById[c.id] = c.name;
@@ -187,6 +159,7 @@ export default async function SupplierCategoriesPage({ params }: Props) {
     count: c.count,
     image: c.image,
     images: c.images,
+    priceOverride: categoryOverrideMap.get(c.id) ?? null,
   }));
 
   return (
@@ -294,11 +267,14 @@ export default async function SupplierCategoriesPage({ params }: Props) {
                 syncModalCreateRule: messages.syncModalCreateRule,
                 syncModalSuccess: messages.syncModalSuccess,
                 syncModalError: messages.syncModalError,
+                syncModalDuplicateRuleError: messages.syncModalDuplicateRuleError,
                 syncModalLoadingStores: messages.syncModalLoadingStores,
                 syncModalLoadingCategories: messages.syncModalLoadingCategories,
                 syncModalNoStores: messages.syncModalNoStores,
                 syncModalNoCategories: messages.syncModalNoCategories,
                 confirmNo: messages.confirmNo,
+                priceOverrideButton: messages.priceOverrideButton,
+                ...pickPriceOverrideMessages(messages),
               }}
               locale={locale}
               supplierId={id}

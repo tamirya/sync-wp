@@ -3,7 +3,7 @@ import Link from "next/link";
 import { isLocale, type Locale } from "@/i18n/config";
 import { notFound, redirect } from "next/navigation";
 import { backendFetch } from "@/lib/backend-fetch";
-import { getAppMessages } from "@/messages/app";
+import { getAppMessages, pickPriceOverrideMessages } from "@/messages/app";
 import { formatWooStorePriceFromFields } from "@/lib/mapping-tree-utils";
 import {
   SupplierCatPageClient,
@@ -118,9 +118,31 @@ function parseWooProducts(data: unknown): ParsedProduct[] {
   return out;
 }
 
+type PriceOverrideRaw = {
+  type: "product" | "category";
+  targetId: number;
+  markupPercent: number;
+  useSalePrices: boolean;
+};
+
 /* ------------------------------------------------------------------ */
 /*  Data fetchers                                                       */
 /* ------------------------------------------------------------------ */
+async function fetchPriceOverrides(
+  supplierId: string,
+): Promise<PriceOverrideRaw[]> {
+  try {
+    const res = await backendFetch(
+      `/suppliers/${supplierId}/price-overrides`,
+    );
+    if (!res.ok) return [];
+    const json = (await res.json()) as { data?: PriceOverrideRaw[] };
+    return json.data ?? [];
+  } catch {
+    return [];
+  }
+}
+
 async function fetchSupplier(
   id: string,
 ): Promise<{ ok: true; supplier: Supplier } | { ok: false; status: number }> {
@@ -147,19 +169,39 @@ async function fetchCategories(
   }
 }
 
+const PRODUCTS_PER_PAGE = 24;
+
+type ProductsPage = {
+  products: ParsedProduct[];
+  total: number;
+  page: number;
+  perPage: number;
+  totalPages: number;
+};
+
 async function fetchProducts(
   supplierId: string,
-): Promise<{ ok: true; products: ParsedProduct[] } | { ok: false }> {
+  categoryId: number,
+  page: number,
+): Promise<{ ok: true } & ProductsPage | { ok: false }> {
   try {
-    const res = await backendFetch(`/suppliers/${supplierId}/products`);
+    const params = new URLSearchParams({
+      categoryId: String(categoryId),
+      page: String(page),
+      perPage: String(PRODUCTS_PER_PAGE),
+    });
+    const res = await backendFetch(`/suppliers/${supplierId}/products?${params}`);
     if (!res.ok) return { ok: false };
-    const json = (await res.json()) as { data?: unknown };
-    const arr = Array.isArray(json.data)
-      ? json.data
-      : Array.isArray((json as Record<string, unknown>).products)
-        ? (json as Record<string, unknown>).products
-        : [];
-    return { ok: true, products: parseWooProducts(arr) };
+    const json = (await res.json()) as { data?: { products?: unknown[]; total?: number; page?: number; perPage?: number; totalPages?: number } };
+    const d = json.data ?? {};
+    return {
+      ok: true,
+      products: parseWooProducts(d.products ?? []),
+      total: d.total ?? 0,
+      page: d.page ?? page,
+      perPage: d.perPage ?? PRODUCTS_PER_PAGE,
+      totalPages: d.totalPages ?? 1,
+    };
   } catch {
     return { ok: false };
   }
@@ -170,10 +212,12 @@ async function fetchProducts(
 /* ------------------------------------------------------------------ */
 type Props = {
   params: Promise<{ locale: string; id: string; catId: string }>;
+  searchParams: Promise<{ page?: string }>;
 };
 
-export default async function SupplierCategoryProductsPage({ params }: Props) {
+export default async function SupplierCategoryProductsPage({ params, searchParams }: Props) {
   const { locale: raw, id, catId } = await params;
+  const { page: pageParam } = await searchParams;
   if (!isLocale(raw)) notFound();
   const locale = raw as Locale;
   const messages = getAppMessages(locale);
@@ -181,11 +225,32 @@ export default async function SupplierCategoryProductsPage({ params }: Props) {
   const catIdNum = Number(catId);
   if (!Number.isFinite(catIdNum)) notFound();
 
-  const [supplierResult, categoriesResult, productsResult] = await Promise.all([
-    fetchSupplier(id),
-    fetchCategories(id),
-    fetchProducts(id),
-  ]);
+  const currentPage = Math.max(Number(pageParam ?? "1") || 1, 1);
+
+  const [supplierResult, categoriesResult, productsResult, priceOverrides] =
+    await Promise.all([
+      fetchSupplier(id),
+      fetchCategories(id),
+      fetchProducts(id, catIdNum, currentPage),
+      fetchPriceOverrides(id),
+    ]);
+
+  const productOverrideMap = new Map<
+    number,
+    { markupPercent: number; useSalePrices: boolean }
+  >();
+  const categoryOverrideMap = new Map<
+    number,
+    { markupPercent: number; useSalePrices: boolean }
+  >();
+  for (const o of priceOverrides) {
+    const val = {
+      markupPercent: Number(o.markupPercent),
+      useSalePrices: o.useSalePrices !== false,
+    };
+    if (o.type === "product") productOverrideMap.set(o.targetId, val);
+    else categoryOverrideMap.set(o.targetId, val);
+  }
 
   if (!supplierResult.ok) {
     if (supplierResult.status === 401) {
@@ -231,12 +296,11 @@ export default async function SupplierCategoryProductsPage({ params }: Props) {
     );
   }
 
-  /* Products belonging to this category */
+  /* Products — already filtered by categoryId on the server */
   const loadFailed = !productsResult.ok;
-  const allProducts = productsResult.ok ? productsResult.products : [];
-  const products = allProducts.filter((p) =>
-    p.categories.some((c) => c.id === catIdNum),
-  );
+  const products = productsResult.ok ? productsResult.products : [];
+  const totalProducts = productsResult.ok ? productsResult.total : 0;
+  const totalPages = productsResult.ok ? productsResult.totalPages : 1;
 
   return (
     <div className="mx-auto pb-12">
@@ -323,9 +387,16 @@ export default async function SupplierCategoryProductsPage({ params }: Props) {
             images: sub.images,
             href: `/${locale}/suppliers/${id}/categories/${sub.id}`,
             displayCount: totalCount(sub.id),
+            priceOverride: categoryOverrideMap.get(sub.id) ?? null,
           }),
         )}
-        products={products}
+        products={products.map((p) => ({
+          ...p,
+          priceOverride: productOverrideMap.get(p.id) ?? null,
+        }))}
+        totalProducts={totalProducts}
+        currentPage={currentPage}
+        totalPages={totalPages}
         loadFailed={loadFailed}
         locale={locale}
         supplierId={Number(id)}
@@ -359,11 +430,14 @@ export default async function SupplierCategoryProductsPage({ params }: Props) {
           syncModalCreateRule: messages.syncModalCreateRule,
           syncModalSuccess: messages.syncModalSuccess,
           syncModalError: messages.syncModalError,
+          syncModalDuplicateRuleError: messages.syncModalDuplicateRuleError,
           syncModalLoadingStores: messages.syncModalLoadingStores,
           syncModalLoadingCategories: messages.syncModalLoadingCategories,
           syncModalNoStores: messages.syncModalNoStores,
           syncModalNoCategories: messages.syncModalNoCategories,
           confirmNo: messages.confirmNo,
+          priceOverrideButton: messages.priceOverrideButton,
+          ...pickPriceOverrideMessages(messages),
         }}
       />
     </div>

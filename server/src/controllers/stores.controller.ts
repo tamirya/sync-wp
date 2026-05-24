@@ -5,11 +5,14 @@ import { SyncSingleRuleImportDto } from '@dtos/sync-single-rule-import.dto';
 import { CreateStoreDto } from '@dtos/stores.dto';
 import { RequestWithUser } from '@interfaces/auth.interface';
 import { Store, StoreProductCategory, StoreSummary, StoreWooProduct } from '@interfaces/stores.interface';
-import { StoreApiImportResult, StoreRulesSyncImportResult } from '@services/store-catalog.service';
+import { StoreRulesSyncImportResult } from '@services/store-catalog.service';
 import storeService from '@services/stores.service';
+import JobsService from '@services/jobs.service';
+import { storeSyncQueue } from '@/queues';
 
 class StoresController {
   public storeService = new storeService();
+  private jobsService = new JobsService();
 
   public getStores = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
@@ -147,8 +150,16 @@ class StoresController {
     try {
       const storeId: string = req.params.id;
       const body: SyncSingleRuleImportDto = req.body;
-      const data = await this.storeService.importProductsSyncSingleRule(storeId, req.user.id, body);
-      res.status(200).json({ data, message: 'importSyncSingleRule' });
+      await this.storeService.findStoreById(storeId, req.user.id);
+
+      if (await this.jobsService.hasActiveJob('store_import_single_rule', Number(storeId))) {
+        res.status(409).json({ message: 'An import job for this store is already running' });
+        return;
+      }
+
+      const job = await this.jobsService.createJob('store_import_single_rule', Number(storeId), req.user.id);
+      await storeSyncQueue.add('import_single_rule', { jobId: job.id, storeId, userId: req.user.id, syncSingleRuleDto: body });
+      res.status(202).json({ data: { jobId: job.id }, message: 'importSyncSingleRuleQueued' });
     } catch (error) {
       next(error);
     }
@@ -158,8 +169,16 @@ class StoresController {
     try {
       const storeId: string = req.params.id;
       const body: SyncStoreRulesImportDto = req.body;
-      const data: StoreRulesSyncImportResult = await this.storeService.importProductsSyncAllRules(storeId, req.user.id, body);
-      res.status(200).json({ data, message: 'importSyncRules' });
+      await this.storeService.findStoreById(storeId, req.user.id);
+
+      if (await this.jobsService.hasActiveJob('store_import_rules', Number(storeId))) {
+        res.status(409).json({ message: 'An import job for this store is already running' });
+        return;
+      }
+
+      const job = await this.jobsService.createJob('store_import_rules', Number(storeId), req.user.id);
+      await storeSyncQueue.add('import_rules', { jobId: job.id, storeId, userId: req.user.id, syncRulesDto: body });
+      res.status(202).json({ data: { jobId: job.id }, message: 'importSyncRulesQueued' });
     } catch (error) {
       next(error);
     }
@@ -169,8 +188,16 @@ class StoresController {
     try {
       const storeId: string = req.params.id;
       const body: ImportStoreProductsDto = req.body;
-      const data: StoreApiImportResult = await this.storeService.importProductsFromStoreApi(storeId, req.user.id, body);
-      res.status(200).json({ data, message: 'importBatch' });
+      await this.storeService.findStoreById(storeId, req.user.id);
+
+      if (await this.jobsService.hasActiveJob('store_import_store_api', Number(storeId))) {
+        res.status(409).json({ message: 'An import job for this store is already running' });
+        return;
+      }
+
+      const job = await this.jobsService.createJob('store_import_store_api', Number(storeId), req.user.id);
+      await storeSyncQueue.add('import_store_api', { jobId: job.id, storeId, userId: req.user.id, importStoreApiDto: body });
+      res.status(202).json({ data: { jobId: job.id }, message: 'importBatchQueued' });
     } catch (error) {
       next(error);
     }
@@ -179,8 +206,16 @@ class StoresController {
   public syncStoreCategories = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
       const storeId: string = req.params.id;
-      const data = await this.storeService.syncStoreCategories(storeId, req.user.id);
-      res.status(200).json({ data, message: 'categoriesSynced' });
+      await this.storeService.findStoreById(storeId, req.user.id);
+
+      if (await this.jobsService.hasActiveJob('store_categories', Number(storeId))) {
+        res.status(409).json({ message: 'A sync job for this store is already running' });
+        return;
+      }
+
+      const job = await this.jobsService.createJob('store_categories', Number(storeId), req.user.id);
+      await storeSyncQueue.add('categories', { jobId: job.id, storeId, userId: req.user.id });
+      res.status(202).json({ data: { jobId: job.id }, message: 'categoriesSyncQueued' });
     } catch (error) {
       next(error);
     }
@@ -189,8 +224,16 @@ class StoresController {
   public syncStoreCatalog = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
       const storeId: string = req.params.id;
-      const data = await this.storeService.syncStoreCatalog(storeId, req.user.id);
-      res.status(200).json({ data, message: 'catalogSynced' });
+      await this.storeService.findStoreById(storeId, req.user.id);
+
+      if (await this.jobsService.hasActiveJob('store_catalog', Number(storeId))) {
+        res.status(409).json({ message: 'A sync job for this store is already running' });
+        return;
+      }
+
+      const job = await this.jobsService.createJob('store_catalog', Number(storeId), req.user.id);
+      await storeSyncQueue.add('catalog', { jobId: job.id, storeId, userId: req.user.id });
+      res.status(202).json({ data: { jobId: job.id }, message: 'catalogSyncQueued' });
     } catch (error) {
       next(error);
     }

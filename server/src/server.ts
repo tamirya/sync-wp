@@ -10,10 +10,14 @@ import '@models/supplierCatalog.model';
 import '@models/storeCatalog.model';
 import '@models/supplierCategory.model';
 import '@models/storeCategory.model';
+import '@models/syncJob.model';
+import '@models/priceOverride.model';
 
 import App from '@/app';
 import AuthRoute from '@routes/auth.route';
 import CategoryRulesRoute from '@routes/category-rules.route';
+import JobsRoute from '@routes/jobs.route';
+import PriceOverrideRoute from '@routes/priceOverride.route';
 import ProductCategoryRulesRoute from '@routes/product-category-rules.route';
 import EnvToStoreRoute from '@routes/envToStore.route';
 import IndexRoute from '@routes/index.route';
@@ -38,6 +42,8 @@ async function bootstrap() {
     new EnvToStoreRoute(),
     new SuppliersRoute(),
     new CategoryRulesRoute(),
+    new JobsRoute(),
+    new PriceOverrideRoute(),
     new ProductCategoryRulesRoute(),
     new AuthRoute(),
   ]);

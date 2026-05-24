@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { backendFetch } from "@/lib/backend-fetch";
 
 export type SyncResult =
-  | { ok: true }
+  | { ok: true; jobId: string }
   | { ok: false; message: string };
 
 async function readApiError(res: Response): Promise<string> {
@@ -28,8 +28,13 @@ export async function syncSupplierProductsAction(
     if (!res.ok) {
       return { ok: false, message: await readApiError(res) };
     }
+    const json = (await res.json()) as { data?: { jobId?: string } };
+    const jobId = json.data?.jobId;
+    if (!jobId) {
+      return { ok: false, message: "No jobId returned from server" };
+    }
     revalidatePath(`/${locale}/suppliers`);
-    return { ok: true };
+    return { ok: true, jobId };
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Error" };
   }
@@ -46,8 +51,13 @@ export async function syncSupplierCategoriesAction(
     if (!res.ok) {
       return { ok: false, message: await readApiError(res) };
     }
+    const json = (await res.json()) as { data?: { jobId?: string } };
+    const jobId = json.data?.jobId;
+    if (!jobId) {
+      return { ok: false, message: "No jobId returned from server" };
+    }
     revalidatePath(`/${locale}/suppliers`);
-    return { ok: true };
+    return { ok: true, jobId };
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Error" };
   }

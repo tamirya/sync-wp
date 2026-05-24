@@ -10,6 +10,7 @@ import {
   type ProductMappingRule,
   type SupplierProductInfo,
 } from "@/lib/mapping-api";
+import { backendFetch } from "@/lib/backend-fetch";
 import { fetchStoresForUser } from "@/lib/stores-api";
 import { fetchSuppliersForUser } from "@/lib/suppliers-api";
 import { getAppMessages } from "@/messages/app";
@@ -82,7 +83,41 @@ export default async function MappingPage({ params }: Props) {
     ]),
   ];
 
-  const [storeCatResults, supplierCatResults, supplierProdResults] =
+  type PriceOverrideEntry = {
+    type: string;
+    targetId: number;
+    markupPercent: number;
+    useSalePrices: boolean;
+  };
+
+  type SupplierOverrides = {
+    supplierId: number;
+    products: Map<number, string>;
+    categories: Map<number, string>;
+  };
+
+  async function fetchOverridesForSupplier(
+    supplierId: number,
+  ): Promise<SupplierOverrides> {
+    const products = new Map<number, string>();
+    const categories = new Map<number, string>();
+    try {
+      const res = await backendFetch(
+        `/suppliers/${supplierId}/price-overrides`,
+      );
+      if (!res.ok) return { supplierId, products, categories };
+      const json = (await res.json()) as { data?: PriceOverrideEntry[] };
+      for (const o of json.data ?? []) {
+        const pct = Number(o.markupPercent);
+        const label = pct > 0 ? `+${pct}%` : `${pct}%`;
+        if (o.type === "product") products.set(o.targetId, label);
+        else if (o.type === "category") categories.set(o.targetId, label);
+      }
+    } catch {}
+    return { supplierId, products, categories };
+  }
+
+  const [storeCatResults, supplierCatResults, supplierProdResults, overrideResults] =
     await Promise.all([
       Promise.all(
         rulesStoreIds.map((id) => fetchStoreCategoriesForMapping(String(id))),
@@ -97,7 +132,20 @@ export default async function MappingPage({ params }: Props) {
           fetchSupplierProductsForMapping(String(id)),
         ),
       ),
+      Promise.all(rulesSupplierIds.map((id) => fetchOverridesForSupplier(id))),
     ]);
+
+  // Build lookups: `${supplierId}_${id}` → formatted price string
+  const productPriceOverrideMap = new Map<string, string>();
+  const categoryPriceOverrideMap = new Map<string, string>();
+  for (const { supplierId, products, categories } of overrideResults) {
+    for (const [productId, price] of products) {
+      productPriceOverrideMap.set(`${supplierId}_${productId}`, price);
+    }
+    for (const [categoryId, price] of categories) {
+      categoryPriceOverrideMap.set(`${supplierId}_${categoryId}`, price);
+    }
+  }
 
   const storeCategoryMap: Record<number, string> = {};
   for (const r of storeCatResults) {
@@ -131,11 +179,32 @@ export default async function MappingPage({ params }: Props) {
   }
 
   const supplierProductMap: Record<number, SupplierProductInfo> = {};
-  for (const r of supplierProdResults) {
+  for (let i = 0; i < supplierProdResults.length; i++) {
+    const supplierId = rulesSupplierIds[i];
+    const r = supplierProdResults[i];
     if (r.ok) {
       r.products.forEach((p) => {
-        supplierProductMap[p.id] = { name: p.name, sku: p.sku, price: p.price };
+        const overridePrice =
+          productPriceOverrideMap.get(`${supplierId}_${p.id}`) ?? null;
+        supplierProductMap[p.id] = {
+          name: p.name,
+          sku: p.sku,
+          price: overridePrice ?? p.price,
+          isOverridden: overridePrice != null,
+        };
       });
+    }
+  }
+
+  // Fill in any products referenced by rules that weren't in the bulk fetch,
+  // using embedded info from the rule payload if available.
+  for (const rule of productMappingRules) {
+    if (!supplierProductMap[rule.sourceProductId] && rule.embeddedProduct) {
+      supplierProductMap[rule.sourceProductId] = {
+        name: rule.embeddedProduct.name ?? `#${rule.sourceProductId}`,
+        sku: rule.embeddedProduct.sku ?? "",
+        price: null,
+      };
     }
   }
 
@@ -182,6 +251,7 @@ export default async function MappingPage({ params }: Props) {
           supplierCategoryMap={supplierCategoryMap}
           supplierCategoryCountMap={supplierCategoryCountMap}
           supplierProductMap={supplierProductMap}
+          categoryPriceOverrideMap={Object.fromEntries(categoryPriceOverrideMap)}
         />
       </div>
     </div>

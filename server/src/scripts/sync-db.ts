@@ -9,6 +9,8 @@ import '../models/supplierCatalog.model';
 import '../models/storeCatalog.model';
 import '../models/supplierCategory.model';
 import '../models/storeCategory.model';
+import '../models/syncJob.model';
+import '../models/priceOverride.model';
 
 async function main(): Promise<void> {
   await sequelize.authenticate();

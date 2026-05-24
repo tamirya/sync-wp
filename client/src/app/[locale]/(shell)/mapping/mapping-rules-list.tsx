@@ -24,6 +24,8 @@ type Props = {
   supplierCategoryMap: Record<number, string>;
   supplierCategoryCountMap: Record<number, number>;
   supplierProductMap: Record<number, SupplierProductInfo>;
+  /** key: `${supplierId}_${categoryId}` → formatted price string */
+  categoryPriceOverrideMap?: Record<string, string>;
   onDeleteCategoryRule?: (id: number) => void;
   onDeleteProductRule?: (id: number) => void;
   onToggleCategoryRule?: (id: number, enabled: boolean) => Promise<unknown>;
@@ -304,6 +306,7 @@ function CategoryRuleRow({
   supplierCategoryName,
   supplierCategoryCount,
   storeCategoryName,
+  overridePrice,
   messages,
   onDelete,
   onToggle,
@@ -315,6 +318,7 @@ function CategoryRuleRow({
   supplierCategoryName: string;
   supplierCategoryCount: number | null;
   storeCategoryName: string;
+  overridePrice: string | null;
   messages: AppMessages;
   onDelete?: (id: number) => void;
   onToggle?: (id: number, enabled: boolean) => Promise<unknown>;
@@ -360,7 +364,14 @@ function CategoryRuleRow({
             </span>
           )}
         </span>
-        {range && <span className="text-[11px] text-muted">{range}</span>}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {overridePrice && (
+            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-300">
+              {messages.mappingProductPrice}: {overridePrice}
+            </span>
+          )}
+          {range && <span className="text-[11px] text-muted">{range}</span>}
+        </div>
       </div>
 
       <svg
@@ -491,7 +502,13 @@ function ProductRuleRow({
             </span>
           )}
           {price && (
-            <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold text-primary">
+            <span
+              className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                product?.isOverridden
+                  ? "bg-amber-100 text-amber-700 ring-1 ring-amber-300"
+                  : "bg-primary/10 text-primary"
+              }`}
+            >
               {messages.mappingProductPrice}: {price}
             </span>
           )}
@@ -573,6 +590,7 @@ export function MappingRulesList({
   supplierCategoryMap,
   supplierCategoryCountMap,
   supplierProductMap,
+  categoryPriceOverrideMap,
   onDeleteCategoryRule,
   onDeleteProductRule,
   onToggleCategoryRule,
@@ -626,6 +644,11 @@ export function MappingRulesList({
                   storeCategoryName={
                     storeCategoryMap[rule.storeCategoryId] ??
                     `#${rule.storeCategoryId}`
+                  }
+                  overridePrice={
+                    categoryPriceOverrideMap?.[
+                      `${rule.supplierId}_${rule.supplierCategoryId}`
+                    ] ?? null
                   }
                   messages={messages}
                   onDelete={onDeleteCategoryRule}

@@ -696,6 +696,7 @@ class StoreService {
       {
         storeId: sid,
         supplierId,
+        userId,
       },
       store.port,
     );
@@ -854,7 +855,7 @@ class StoreService {
         products,
         importDto,
         resolution,
-        { storeId: sid, supplierId },
+        { storeId: sid, supplierId, userId },
         store.port,
       );
       bySupplier.push({ supplierId, ...result });
@@ -914,7 +915,7 @@ class StoreService {
         [product],
         importDto,
         resolution,
-        { storeId: sid, supplierId: rule.supplierId },
+        { storeId: sid, supplierId: rule.supplierId, userId },
         store.port,
       );
     }
@@ -964,7 +965,7 @@ class StoreService {
       products,
       importDto,
       resolution,
-      { storeId: sid, supplierId: rule.supplierId },
+      { storeId: sid, supplierId: rule.supplierId, userId },
       store.port,
     );
   }

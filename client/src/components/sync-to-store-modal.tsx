@@ -20,6 +20,7 @@ export type SyncToStoreModalMessages = {
   syncModalCreateRule: string;
   syncModalSuccess: string;
   syncModalError: string;
+  syncModalDuplicateRuleError: string;
   syncModalLoadingStores: string;
   syncModalLoadingCategories: string;
   syncModalNoStores: string;
@@ -183,7 +184,12 @@ export function SyncToStoreModal({
 
       const failed = results.find((r) => !r.ok);
       if (failed && !failed.ok) {
-        setErrorMsg(`${messages.syncModalError} ${failed.error}`);
+        const isDuplicate = /already exists/i.test(failed.error);
+        setErrorMsg(
+          isDuplicate
+            ? messages.syncModalDuplicateRuleError
+            : messages.syncModalError,
+        );
       } else {
         setSuccessMsg(messages.syncModalSuccess);
         onSuccess?.();

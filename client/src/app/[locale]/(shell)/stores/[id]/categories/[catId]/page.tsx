@@ -228,7 +228,7 @@ function ProductCard({
     product.salePrice !== product.regularPrice;
 
   return (
-    <div className="group flex flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-all hover:shadow-md hover:border-primary/40 hover:-translate-y-0.5">
+    <div className="group flex flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-all hover:shadow-md hover:border-primary/40">
       {/* Thumbnail */}
       <div className="relative h-44 w-full shrink-0 overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100">
         {imgSrc ? (
@@ -361,7 +361,7 @@ function SubCategoryCard({
   return (
     <Link
       href={href}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:border-primary/30"
+      className="group flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-all duration-200 hover:shadow-lg hover:border-primary/30"
     >
       {/* Gradient thumbnail */}
       <div

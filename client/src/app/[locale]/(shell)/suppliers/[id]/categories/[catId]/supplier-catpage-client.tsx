@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   SyncToStoreModal,
@@ -10,12 +10,25 @@ import {
   SelectionSidePanel,
   type SelectionSidePanelMessages,
 } from "@/components/selection-side-panel";
+import {
+  PriceOverrideModal,
+  type PriceOverrideModalMessages,
+} from "@/components/price-override-modal";
+import {
+  effectiveProductPrice,
+  formatMarkupLabel,
+  parsePriceString,
+  previewPriceWithMarkup,
+  type PriceOverride,
+} from "@/lib/price-utils";
 
-const PAGE_SIZE = 24;
+const PAGE_WINDOW = 2; // pages shown on each side of the current page
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
 /* ------------------------------------------------------------------ */
+export type { PriceOverride };
+
 export type ClientSubCategory = {
   id: number;
   name: string;
@@ -25,6 +38,7 @@ export type ClientSubCategory = {
   images?: { src?: string | null; alt?: string | null }[] | null;
   href: string;
   displayCount: number | null;
+  priceOverride?: PriceOverride | null;
 };
 
 export type ClientProduct = {
@@ -38,6 +52,7 @@ export type ClientProduct = {
   stockAvailabilityText: string | null;
   image: { src?: string | null; alt?: string | null } | null;
   permalink: string | null;
+  priceOverride?: PriceOverride | null;
 };
 
 type Messages = {
@@ -60,7 +75,9 @@ type Messages = {
   selectionPanelProductsSection: string;
   selectionPanelEmpty: string;
   syncToStoreButton: string;
-} & SyncToStoreModalMessages;
+  priceOverrideButton: string;
+} & SyncToStoreModalMessages &
+  PriceOverrideModalMessages;
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                           */
@@ -129,13 +146,21 @@ function SubCatCard({
   sub,
   isSelected,
   onToggle,
+  supplierId,
   messages,
+  onOverrideSaved,
 }: {
   sub: ClientSubCategory;
   isSelected: boolean;
   onToggle: () => void;
+  supplierId: number;
   messages: Messages;
+  onOverrideSaved?: (id: number, override: PriceOverride) => void;
 }) {
+  const [overrideModalOpen, setOverrideModalOpen] = useState(false);
+  const [localOverride, setLocalOverride] = useState<PriceOverride | null>(
+    sub.priceOverride ?? null,
+  );
   const imgSrc =
     sub.image?.src ??
     (Array.isArray(sub.images) ? sub.images[0]?.src : null) ??
@@ -148,7 +173,7 @@ function SubCatCard({
 
   return (
     <div
-      className={`group flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${
+      className={`group flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-all duration-200 hover:shadow-lg ${
         isSelected
           ? "border-primary/70 ring-2 ring-primary/20"
           : "border-border/60 hover:border-primary/30"
@@ -206,6 +231,11 @@ function SubCatCard({
           ) : (
             <span />
           )}
+          {localOverride && (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200">
+              {formatMarkupLabel(localOverride.markupPercent)}
+            </span>
+          )}
           <Link
             href={sub.href}
             tabIndex={-1}
@@ -229,21 +259,52 @@ function SubCatCard({
           </Link>
         </div>
 
-        {/* Select button */}
-        <button
-          onClick={onToggle}
-          className={`mt-auto w-full rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
-            isSelected
-              ? "bg-primary text-white shadow-sm hover:bg-primary/90"
-              : "border border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-          }`}
-          aria-label={
-            isSelected ? messages.selectedLabel : messages.selectLabel
-          }
-        >
-          {isSelected ? messages.selectedLabel : messages.selectLabel}
-        </button>
+        {/* Select + price override buttons */}
+        <div className="mt-auto flex gap-2">
+          <button
+            onClick={onToggle}
+            className={`flex-1 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+              isSelected
+                ? "bg-primary text-white shadow-sm hover:bg-primary/90"
+                : "border border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+            }`}
+            aria-label={
+              isSelected ? messages.selectedLabel : messages.selectLabel
+            }
+          >
+            {isSelected ? messages.selectedLabel : messages.selectLabel}
+          </button>
+          <button
+            onClick={() => setOverrideModalOpen(true)}
+            title={messages.priceOverrideButton}
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border transition-all ${
+              localOverride
+                ? "border-amber-400 bg-amber-50 text-amber-600 hover:bg-amber-100"
+                : "border-border bg-card text-muted hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+            }`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
+              <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" />
+              <path d="M12 6v6l4 2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
       </div>
+
+      <PriceOverrideModal
+        open={overrideModalOpen}
+        onClose={() => setOverrideModalOpen(false)}
+        supplierId={supplierId}
+        type="category"
+        targetId={sub.id}
+        targetName={sub.name}
+        currentOverride={localOverride}
+        messages={messages}
+        onSaved={(override) => {
+          setLocalOverride(override);
+          onOverrideSaved?.(sub.id, override);
+        }}
+      />
     </div>
   );
 }
@@ -255,13 +316,21 @@ function ProductCard({
   product,
   isSelected,
   onToggle,
+  supplierId,
   messages,
+  onOverrideSaved,
 }: {
   product: ClientProduct;
   isSelected: boolean;
   onToggle: () => void;
+  supplierId: number;
   messages: Messages;
+  onOverrideSaved?: (id: number, override: PriceOverride) => void;
 }) {
+  const [overrideModalOpen, setOverrideModalOpen] = useState(false);
+  const [localOverride, setLocalOverride] = useState<PriceOverride | null>(
+    product.priceOverride ?? null,
+  );
   const imgSrc = product.image?.src ?? null;
   const imgAlt = product.image?.alt || product.name;
   const hasSale =
@@ -319,7 +388,39 @@ function ProductCard({
             )}
           </div>
 
-          {(product.price ?? product.regularPrice) && (
+          {localOverride ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-base font-bold text-amber-600">
+                {formatMarkupLabel(localOverride.markupPercent)}
+              </span>
+              {previewPriceWithMarkup(
+                effectiveProductPrice(
+                  {
+                    regularPrice: parsePriceString(product.regularPrice),
+                    salePrice: parsePriceString(product.salePrice),
+                    displayPrice: parsePriceString(product.price ?? product.regularPrice),
+                  },
+                  localOverride.useSalePrices,
+                ),
+                localOverride.markupPercent,
+              ) && (
+                <span className="text-sm text-muted">
+                  →{" "}
+                  {previewPriceWithMarkup(
+                    effectiveProductPrice(
+                      {
+                        regularPrice: parsePriceString(product.regularPrice),
+                        salePrice: parsePriceString(product.salePrice),
+                        displayPrice: parsePriceString(product.price ?? product.regularPrice),
+                      },
+                      localOverride.useSalePrices,
+                    ),
+                    localOverride.markupPercent,
+                  )}
+                </span>
+              )}
+            </div>
+          ) : (product.price ?? product.regularPrice) && (
             <div className="flex flex-wrap items-center gap-2">
               {hasSale ? (
                 <>
@@ -381,18 +482,52 @@ function ProductCard({
             )}
           </div>
 
-          <button
-            onClick={onToggle}
-            className={`w-full rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
-              isSelected
-                ? "bg-primary text-white shadow-sm hover:bg-primary/90"
-                : "border border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-            }`}
-          >
-            {isSelected ? messages.selectedLabel : messages.selectLabel}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={onToggle}
+              className={`flex-1 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+                isSelected
+                  ? "bg-primary text-white shadow-sm hover:bg-primary/90"
+                  : "border border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+              }`}
+            >
+              {isSelected ? messages.selectedLabel : messages.selectLabel}
+            </button>
+            <button
+              onClick={() => setOverrideModalOpen(true)}
+              title={messages.priceOverrideButton}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border transition-all ${
+                localOverride
+                  ? "border-amber-400 bg-amber-50 text-amber-600 hover:bg-amber-100"
+                  : "border-border bg-card text-muted hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+              }`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
+
+      <PriceOverrideModal
+        open={overrideModalOpen}
+        onClose={() => setOverrideModalOpen(false)}
+        supplierId={supplierId}
+        type="product"
+        targetId={product.id}
+        targetName={product.name}
+        currentOverride={localOverride}
+        supplierRegularPrice={parsePriceString(product.regularPrice)}
+        supplierSalePrice={parsePriceString(product.salePrice)}
+        supplierDisplayPrice={parsePriceString(product.price ?? product.regularPrice)}
+        messages={messages}
+        onSaved={(override) => {
+          setLocalOverride(override);
+          onOverrideSaved?.(product.id, override);
+        }}
+      />
     </div>
   );
 }
@@ -428,7 +563,11 @@ function loadSelection(supplierId: number): PersistedSelection {
   try {
     const raw = sessionStorage.getItem(storageKey(supplierId));
     if (!raw) return { catItems: [], prodItems: [] };
-    return JSON.parse(raw) as PersistedSelection;
+    const parsed = JSON.parse(raw) as Partial<PersistedSelection>;
+    return {
+      catItems: Array.isArray(parsed.catItems) ? parsed.catItems : [],
+      prodItems: Array.isArray(parsed.prodItems) ? parsed.prodItems : [],
+    };
   } catch {
     return { catItems: [], prodItems: [] };
   }
@@ -449,6 +588,9 @@ function saveSelection(supplierId: number, sel: PersistedSelection) {
 export function SupplierCatPageClient({
   subCategories,
   products,
+  totalProducts,
+  currentPage,
+  totalPages,
   loadFailed,
   messages,
   locale,
@@ -458,6 +600,9 @@ export function SupplierCatPageClient({
 }: {
   subCategories: ClientSubCategory[];
   products: ClientProduct[];
+  totalProducts: number;
+  currentPage: number;
+  totalPages: number;
   loadFailed: boolean;
   messages: Messages;
   locale: string;
@@ -487,32 +632,23 @@ export function SupplierCatPageClient({
   }, [supplierId]);
 
   const [syncModalOpen, setSyncModalOpen] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const sentinelRef = useRef<HTMLDivElement>(null);
 
   /* Helper — save immediately (not deferred) so rapid navigation can't lose data */
   function persist(cats: PersistedCatItem[], prods: PersistedProdItem[]) {
     saveSelection(supplierId, { catItems: cats, prodItems: prods });
   }
 
-  const visibleProducts = products.slice(0, visibleCount);
-  const hasMore = visibleCount < products.length;
-
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel || !hasMore) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting)
-          setVisibleCount((prev) =>
-            Math.min(prev + PAGE_SIZE, products.length),
-          );
-      },
-      { rootMargin: "200px" },
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasMore, products.length]);
+  /* Pagination page links — build a compact window of page numbers */
+  function buildPageLinks(current: number, total: number): (number | "…")[] {
+    if (total <= 1) return [];
+    const pages: (number | "…")[] = [];
+    const start = Math.max(1, current - PAGE_WINDOW);
+    const end = Math.min(total, current + PAGE_WINDOW);
+    if (start > 1) { pages.push(1); if (start > 2) pages.push("…"); }
+    for (let p = start; p <= end; p++) pages.push(p);
+    if (end < total) { if (end < total - 1) pages.push("…"); pages.push(total); }
+    return pages;
+  }
 
   function toggleCat(id: number) {
     const isSelected = selectedCatIds.has(id);
@@ -601,6 +737,7 @@ export function SupplierCatPageClient({
                 sub={sub}
                 isSelected={selectedCatIds.has(sub.id)}
                 onToggle={() => toggleCat(sub.id)}
+                supplierId={supplierId}
                 messages={messages}
               />
             ))}
@@ -614,7 +751,7 @@ export function SupplierCatPageClient({
           {messages.storeCategoryProductsTitle}{" "}
           {!loadFailed && (
             <span className="font-semibold text-foreground normal-case tracking-normal">
-              ({products.length})
+              ({totalProducts})
             </span>
           )}
         </h2>
@@ -644,37 +781,71 @@ export function SupplierCatPageClient({
         ) : (
           <>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {visibleProducts.map((product) => (
+              {products.map((product) => (
                 <ProductCard
                   key={product.id}
                   product={product}
                   isSelected={selectedProdIds.has(product.id)}
                   onToggle={() => toggleProd(product.id)}
+                  supplierId={supplierId}
                   messages={messages}
                 />
               ))}
             </div>
 
-            {/* Infinite scroll sentinel */}
-            <div ref={sentinelRef} className="flex justify-center">
-              {hasMore && (
-                <div className="flex items-center gap-2 text-sm text-muted">
-                  <svg
-                    className="h-4 w-4 animate-spin"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    aria-hidden
+            {/* Pagination bar */}
+            {totalPages > 1 && (
+              <nav className="mt-8 flex flex-wrap items-center justify-center gap-1" aria-label="Pagination">
+                {/* Prev */}
+                {currentPage > 1 ? (
+                  <Link
+                    href={`?page=${currentPage - 1}`}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-sm text-muted transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                    aria-label="Previous page"
                   >
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                  </svg>
-                  <span>
-                    {visibleCount} / {products.length}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 rtl:rotate-180"><path d="M15 18l-6-6 6-6" /></svg>
+                  </Link>
+                ) : (
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/40 bg-card/40 text-sm text-muted/40 cursor-not-allowed">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 rtl:rotate-180"><path d="M15 18l-6-6 6-6" /></svg>
                   </span>
-                </div>
-              )}
-            </div>
+                )}
+
+                {buildPageLinks(currentPage, totalPages).map((p, i) =>
+                  p === "…" ? (
+                    <span key={`ellipsis-${i}`} className="flex h-9 w-9 items-center justify-center text-sm text-muted">…</span>
+                  ) : (
+                    <Link
+                      key={p}
+                      href={`?page=${p}`}
+                      className={`flex h-9 min-w-[2.25rem] items-center justify-center rounded-lg border px-2 text-sm font-medium transition ${
+                        p === currentPage
+                          ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                          : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                      }`}
+                      aria-current={p === currentPage ? "page" : undefined}
+                    >
+                      {p}
+                    </Link>
+                  ),
+                )}
+
+                {/* Next */}
+                {currentPage < totalPages ? (
+                  <Link
+                    href={`?page=${currentPage + 1}`}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-sm text-muted transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                    aria-label="Next page"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 rtl:rotate-180"><path d="M9 18l6-6-6-6" /></svg>
+                  </Link>
+                ) : (
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/40 bg-card/40 text-sm text-muted/40 cursor-not-allowed">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 rtl:rotate-180"><path d="M9 18l6-6-6-6" /></svg>
+                  </span>
+                )}
+              </nav>
+            )}
           </>
         )}
       </section>

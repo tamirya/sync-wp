@@ -33,6 +33,8 @@ type Props = {
   supplierCategoryMap: Record<number, string>;
   supplierCategoryCountMap: Record<number, number>;
   supplierProductMap: Record<number, SupplierProductInfo>;
+  /** key: `${supplierId}_${categoryId}` → formatted price string */
+  categoryPriceOverrideMap: Record<string, string>;
 };
 
 export function MappingView({
@@ -48,6 +50,7 @@ export function MappingView({
   supplierCategoryMap,
   supplierCategoryCountMap,
   supplierProductMap,
+  categoryPriceOverrideMap,
 }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -105,6 +108,7 @@ export function MappingView({
         supplierCategoryMap={supplierCategoryMap}
         supplierCategoryCountMap={supplierCategoryCountMap}
         supplierProductMap={supplierProductMap}
+        categoryPriceOverrideMap={categoryPriceOverrideMap}
         onDeleteCategoryRule={handleDeleteCategoryRule}
         onDeleteProductRule={handleDeleteProductRule}
         onToggleCategoryRule={(id, enabled) =>

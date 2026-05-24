@@ -1,5 +1,9 @@
 import * as http from 'http';
 import * as https from 'https';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import * as childProcess from 'child_process';
 import { HttpProxyAgent } from 'http-proxy-agent';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import WooCommerceRestApi from '@woocommerce/woocommerce-rest-api';
@@ -8,8 +12,21 @@ import { ImportStoreProductsDto } from '@dtos/import-store-products.dto';
 import { HttpException } from '@exceptions/HttpException';
 import StoreCatalogModel from '@models/storeCatalog.model';
 import SupplierCatalogModel from '@models/supplierCatalog.model';
+import PriceOverrideService, { PriceOverrideResolver, PriceOverrideResult } from '@services/priceOverride.service';
+import { applyMarkupPercent, buildMarkedUpWooPrices, normalizePricesFromCatalogPayload } from '@utils/price-markup';
+
+const priceOverrideService = new PriceOverrideService();
 
 type WooRestClient = InstanceType<typeof WooCommerceRestApi>;
+
+/** Credentials used for downloading supplier images and uploading to WordPress Media Library. */
+export type StoreCredentials = {
+  url: string;
+  consumerKey: string;
+  consumerSecret: string;
+  /** Per-run in-memory cache: supplier image URL → WordPress attachment ID (null = failed/skip). */
+  imageCache?: Map<string, number | null>;
+};
 
 // --- Types ------------------------------------------------------------------
 
@@ -98,6 +115,8 @@ export type StoreRulesSyncImportResult = {
 export type ImportCatalogContext = {
   storeId: number;
   supplierId: number;
+  /** Required to apply price overrides during import. */
+  userId?: number;
 };
 
 export type CatalogSyncResult = {
@@ -676,14 +695,7 @@ export function storeApiProductFromSupplierCatalogRow(row: {
   const id = row.sourceProductId;
   if (row.payload && typeof row.payload === 'object' && !Array.isArray(row.payload)) {
     const p = row.payload as Record<string, unknown>;
-    const pricesRaw = p.prices;
-    const prices: StoreApiPrices =
-      pricesRaw && typeof pricesRaw === 'object' && !Array.isArray(pricesRaw)
-        ? {
-            ...STORE_API_PRODUCT_DEFAULTS.prices,
-            ...(pricesRaw as StoreApiPrices),
-          }
-        : STORE_API_PRODUCT_DEFAULTS.prices;
+    const prices = normalizePricesFromCatalogPayload(p);
     return {
       ...STORE_API_PRODUCT_DEFAULTS,
       ...(p as Partial<StoreApiProduct>),
@@ -764,6 +776,8 @@ async function importStoreApiProductRows(
   importTags: boolean,
   getTargetStoreCategoryId: (p: StoreApiProduct) => number | undefined,
   catalog?: ImportCatalogContext,
+  priceOverrideResolver?: PriceOverrideResolver,
+  storeCredentials?: StoreCredentials,
 ): Promise<{ created: number; updated: number; failed: { sku: string; reason: string }[] }> {
   const failed: { sku: string; reason: string }[] = [];
   let created = 0;
@@ -772,7 +786,8 @@ async function importStoreApiProductRows(
     const { sku } = supplierProductSkusFromStoreApi(p);
     try {
       const targetStoreCategoryId = getTargetStoreCategoryId(p);
-      const payload = await buildWooProductPayload(p, woo, importTags, targetStoreCategoryId, catalog?.supplierId);
+      const priceOverride = priceOverrideResolver?.(p.id, (p.categories || []).map(c => c.id)) ?? undefined;
+      const payload = await buildWooProductPayload(p, woo, importTags, targetStoreCategoryId, catalog?.supplierId, priceOverride, storeCredentials);
       const upsert = await upsertWooProduct(woo, sku, payload);
       if (catalog) {
         await persistCatalogAfterImport(catalog, p, upsert.id, payload);
@@ -806,6 +821,7 @@ export async function importPage(
   const perPage = STORE_API_IMPORT_PER_PAGE;
 
   const woo = createTargetWooClient(targetBase, consumerKey, consumerSecret, port);
+  const storeCredentials: StoreCredentials = { url: targetBase, consumerKey, consumerSecret, imageCache: new Map() };
   const result: StoreApiImportResult = {
     productsSeen: 0,
     created: 0,
@@ -815,6 +831,11 @@ export async function importPage(
     endPage: 0,
     perPage,
   };
+
+  const priceOverrideResolver: PriceOverrideResolver | undefined =
+    catalog?.userId != null
+      ? await priceOverrideService.buildResolver(catalog.supplierId, catalog.userId)
+      : undefined;
 
   let pageNum = 1;
   while (true) {
@@ -848,7 +869,7 @@ export async function importPage(
 
     if (pageProducts.length > 0) {
       const getTargetStoreCategoryId = categoryOpts?.supplierCategoryId != null ? () => categoryOpts.targetStoreCategoryId : () => undefined;
-      const batch = await importStoreApiProductRows(pageProducts, woo, importTags, getTargetStoreCategoryId, catalog);
+      const batch = await importStoreApiProductRows(pageProducts, woo, importTags, getTargetStoreCategoryId, catalog, priceOverrideResolver, storeCredentials);
       result.created += batch.created;
       result.updated += batch.updated;
       result.failed.push(...batch.failed);
@@ -881,6 +902,7 @@ export async function importPageWithRuleResolution(
   const perPage = STORE_API_IMPORT_PER_PAGE;
 
   const woo = createTargetWooClient(targetBase, consumerKey, consumerSecret, port);
+  const storeCredentials: StoreCredentials = { url: targetBase, consumerKey, consumerSecret, imageCache: new Map() };
   const result: StoreApiImportResult = {
     productsSeen: 0,
     created: 0,
@@ -892,6 +914,11 @@ export async function importPageWithRuleResolution(
   };
 
   const getTargetStoreCategoryId = (p: StoreApiProduct) => resolveImportTargetStoreCategoryId(p, resolution);
+
+  const priceOverrideResolver: PriceOverrideResolver | undefined =
+    catalog?.userId != null
+      ? await priceOverrideService.buildResolver(catalog.supplierId, catalog.userId)
+      : undefined;
 
   let pageNum = 1;
   while (true) {
@@ -917,7 +944,7 @@ export async function importPageWithRuleResolution(
     result.endPage = pageNum;
     result.productsSeen += rawRows.length;
 
-    const batch = await importStoreApiProductRows(rawRows, woo, importTags, getTargetStoreCategoryId, catalog);
+    const batch = await importStoreApiProductRows(rawRows, woo, importTags, getTargetStoreCategoryId, catalog, priceOverrideResolver, storeCredentials);
     result.created += batch.created;
     result.updated += batch.updated;
     result.failed.push(...batch.failed);
@@ -948,9 +975,15 @@ export async function importFromSupplierCatalogWithRuleResolution(
   const perPage = STORE_API_IMPORT_PER_PAGE;
 
   const woo = createTargetWooClient(targetBase, consumerKey, consumerSecret, port);
+  const storeCredentials: StoreCredentials = { url: targetBase, consumerKey, consumerSecret, imageCache: new Map() };
   const getTargetStoreCategoryId = (p: StoreApiProduct) => resolveImportTargetStoreCategoryId(p, resolution);
 
-  const batch = await importStoreApiProductRows(products, woo, importTags, getTargetStoreCategoryId, catalog);
+  const priceOverrideResolver: PriceOverrideResolver | undefined =
+    catalog?.userId != null
+      ? await priceOverrideService.buildResolver(catalog.supplierId, catalog.userId)
+      : undefined;
+
+  const batch = await importStoreApiProductRows(products, woo, importTags, getTargetStoreCategoryId, catalog, priceOverrideResolver, storeCredentials);
 
   return {
     productsSeen: products.length,
@@ -969,8 +1002,21 @@ async function buildWooProductPayload(
   importTags: boolean,
   targetStoreCategoryId?: number,
   sourceSupplierId?: number,
+  priceOverride?: PriceOverrideResult,
+  storeCredentials?: StoreCredentials,
 ): Promise<Record<string, unknown>> {
-  const { regular_price, sale_price } = storePriceToWoo(p.prices, Boolean(p.on_sale));
+  let regular_price: string;
+  let sale_price: string | undefined;
+
+  if (priceOverride) {
+    const marked = buildMarkedUpWooPrices(p.prices, Boolean(p.on_sale), priceOverride);
+    regular_price = marked.regular_price;
+    sale_price = marked.sale_price;
+  } else {
+    const wooPrice = storePriceToWoo(p.prices, Boolean(p.on_sale));
+    regular_price = wooPrice.regular_price;
+    sale_price = wooPrice.sale_price;
+  }
 
   let categoryIds: number[];
   if (targetStoreCategoryId != null) {
@@ -1004,10 +1050,12 @@ async function buildWooProductPayload(
     short_description: p.short_description || '',
     description: p.description || '',
     regular_price,
-    ...(sale_price ? { sale_price } : {}),
+    ...(priceOverride ? { sale_price: sale_price ?? '' } : sale_price ? { sale_price } : {}),
     stock_status: p.is_in_stock ? 'instock' : 'outofstock',
     manage_stock: false,
-    images: (p.images || []).map(img => ({ src: img.src })),
+    images: storeCredentials
+      ? await resolveProductImages((p.images || []).filter(i => i.src) as { src: string }[], storeCredentials)
+      : (p.images || []).map(img => ({ src: img.src })),
     categories: categoryIds.map(id => ({ id })),
     ...(tagIds.length ? { tags: tagIds.map(id => ({ id })) } : {}),
     meta_data,
@@ -1033,6 +1081,214 @@ async function ensureProductTerm(woo: WooRestClient, kind: 'categories' | 'tags'
   }
 }
 
+const DOWNLOAD_IMAGE_SCRIPT = path.join(__dirname, '..', 'scripts', 'download_image.py');
+
+/**
+ * Resolves the Python executable to use. Tries PYTHON_EXECUTABLE env var, then common names.
+ * On Windows "python" may be a Store stub, so "py" (launcher) is tried first.
+ */
+function resolvePythonExecutable(): string {
+  return process.env.PYTHON_EXECUTABLE || (process.platform === 'win32' ? 'py' : 'python3');
+}
+
+/**
+ * Downloads a supplier image via a Python subprocess (uses cloudscraper to bypass anti-hotlinking).
+ * Falls back to a native Node.js HTTPS request if Python/cloudscraper is unavailable.
+ * Returns { buffer, contentType } on success, or null on failure.
+ */
+function downloadSupplierImage(imageUrl: string): Promise<{ buffer: Buffer; contentType: string } | null> {
+  return new Promise(resolve => {
+    const tmpFile = path.join(os.tmpdir(), `img_${Date.now()}_${Math.random().toString(36).slice(2)}.bin`);
+    const pyExe = resolvePythonExecutable();
+
+    const py = childProcess.spawn(pyExe, [DOWNLOAD_IMAGE_SCRIPT, imageUrl, tmpFile], { timeout: 25000 });
+    let stdout = '';
+    let stderr = '';
+    py.stdout.on('data', (d: Buffer) => { stdout += d.toString(); });
+    py.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
+
+    py.on('close', code => {
+      if (code !== 0) {
+        // Fall back to Node.js native download
+        downloadSupplierImageNative(imageUrl).then(resolve);
+        return;
+      }
+      try {
+        const buffer = fs.readFileSync(tmpFile);
+        fs.unlinkSync(tmpFile);
+        const contentType = stdout.trim() || 'image/jpeg';
+        resolve({ buffer, contentType });
+      } catch {
+        resolve(null);
+      }
+    });
+
+    py.on('error', () => {
+      // Python not available — fall back to native
+      downloadSupplierImageNative(imageUrl).then(resolve);
+    });
+  });
+}
+
+/** Native Node.js HTTPS fallback for image download (no cloudscraper). */
+function downloadSupplierImageNative(imageUrl: string): Promise<{ buffer: Buffer; contentType: string } | null> {
+  return new Promise(resolve => {
+    try {
+      const url = new URL(imageUrl);
+      const lib = url.protocol === 'https:' ? https : http;
+      const req = lib.request(
+        {
+          method: 'GET',
+          hostname: url.hostname,
+          port: url.port || (url.protocol === 'https:' ? 443 : 80),
+          path: `${url.pathname}${url.search}`,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            Accept: 'image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+            Referer: `${url.protocol}//${url.hostname}/`,
+          },
+          timeout: 15000,
+        },
+        res => {
+          if ((res.statusCode ?? 0) >= 300) { res.resume(); resolve(null); return; }
+          const chunks: Buffer[] = [];
+          res.on('data', (c: Buffer) => chunks.push(c));
+          res.on('end', () => {
+            const contentType = (res.headers['content-type'] || 'image/jpeg').split(';')[0].trim();
+            resolve({ buffer: Buffer.concat(chunks), contentType });
+          });
+          res.on('error', () => resolve(null));
+        },
+      );
+      req.on('error', () => resolve(null));
+      req.on('timeout', () => { req.destroy(); resolve(null); });
+      req.end();
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/**
+ * Uploads an image buffer to the WordPress Media Library via /wp/v2/media.
+ * Uses WooCommerce consumer key/secret as Basic Auth (works over HTTPS when the
+ * WC API user has upload_files capability).
+ * Returns the WordPress attachment ID on success, or null on failure.
+ */
+function uploadImageToWordPress(
+  buffer: Buffer,
+  contentType: string,
+  filename: string,
+  store: StoreCredentials,
+): Promise<number | null> {
+  return new Promise(resolve => {
+    try {
+      const base = store.url.replace(/\/+$/, '');
+      const uploadUrl = new URL(`${base}/wp-json/wp/v2/media`);
+      const lib = uploadUrl.protocol === 'https:' ? https : http;
+      const auth = Buffer.from(`${store.consumerKey}:${store.consumerSecret}`).toString('base64');
+      const safeFilename = filename.replace(/[^a-z0-9._-]/gi, '-').replace(/--+/g, '-') || 'image.jpg';
+
+      const req = lib.request(
+        {
+          method: 'POST',
+          hostname: uploadUrl.hostname,
+          port: uploadUrl.port || (uploadUrl.protocol === 'https:' ? 443 : 80),
+          path: uploadUrl.pathname,
+          headers: {
+            Authorization: `Basic ${auth}`,
+            'Content-Type': contentType,
+            'Content-Disposition': `attachment; filename="${safeFilename}"`,
+            'Content-Length': buffer.length,
+          },
+          timeout: 30000,
+        },
+        res => {
+          let raw = '';
+          res.on('data', (c: Buffer) => { raw += c; });
+          res.on('end', () => {
+            try {
+              const data = JSON.parse(raw) as { id?: number };
+              resolve(typeof data.id === 'number' ? data.id : null);
+            } catch {
+              resolve(null);
+            }
+          });
+          res.on('error', () => resolve(null));
+        },
+      );
+      req.on('error', () => resolve(null));
+      req.on('timeout', () => { req.destroy(); resolve(null); });
+      req.write(buffer);
+      req.end();
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/**
+ * For each image URL: tries to download from supplier + upload to WordPress.
+ * Returns `{ id }` entries on success, `{ src }` entries as fallback, skips broken URLs.
+ * Results are cached in `store.imageCache` to avoid re-uploading on the same sync run.
+ */
+async function resolveProductImages(
+  images: { src: string }[],
+  store: StoreCredentials,
+): Promise<{ src?: string; id?: number }[]> {
+  const result: { src?: string; id?: number }[] = [];
+  for (const img of images) {
+    if (!img.src) continue;
+
+    // Check cache first
+    if (store.imageCache?.has(img.src)) {
+      const cached = store.imageCache.get(img.src);
+      if (cached != null) result.push({ id: cached });
+      // null means previously failed — skip entirely (will be created without this image)
+      continue;
+    }
+
+    const downloaded = await downloadSupplierImage(img.src);
+    if (!downloaded) {
+      store.imageCache?.set(img.src, null);
+      // Fall back to passing the URL — WooCommerce will try on its end
+      result.push({ src: img.src });
+      continue;
+    }
+
+    const filename = img.src.split('/').pop()?.split('?')[0] || 'image.jpg';
+    const attachmentId = await uploadImageToWordPress(downloaded.buffer, downloaded.contentType, filename, store);
+    store.imageCache?.set(img.src, attachmentId);
+
+    if (attachmentId != null) {
+      result.push({ id: attachmentId });
+    } else {
+      // Upload failed — fall back to URL
+      result.push({ src: img.src });
+    }
+  }
+  return result;
+}
+
+/** Returns true when a WooCommerce error is caused by a blocked remote-image download. */
+function isRemoteImageError(msg: string): boolean {
+  // WooCommerce returns Hebrew/English messages like:
+  // "400 שגיאה בקבלת תמונה מרחוק https://... שגיאה: Forbidden"
+  // "400 Error getting image from remote URL https://... Forbidden"
+  return (
+    msg.includes('תמונה מרחוק') ||                         // Hebrew sideload error
+    msg.includes('Error getting image from remote') ||     // English sideload error
+    msg.includes('rest_invalid_image_url') ||              // WooCommerce error code
+    msg.includes('sideload') ||                            // Generic sideload
+    (msg.includes('Forbidden') && msg.includes('upload'))  // Upload URL blocked
+  );
+}
+
+function payloadWithoutImages(payload: Record<string, unknown>): Record<string, unknown> {
+  const { images: _, ...rest } = payload;
+  return rest;
+}
+
 async function upsertWooProduct(
   woo: WooRestClient,
   sku: string,
@@ -1051,7 +1307,17 @@ async function upsertWooProduct(
     try {
       await woo.put(`products/${id}`, payload);
     } catch (err) {
-      throw new Error(`WooCommerce product update failed: ${wooHttpErrorDetail(err)}`);
+      const msg = wooHttpErrorDetail(err);
+      if (isRemoteImageError(msg)) {
+        // Supplier blocks hotlinking — retry without images
+        try {
+          await woo.put(`products/${id}`, payloadWithoutImages(payload));
+        } catch (err2) {
+          throw new Error(`WooCommerce product update failed: ${wooHttpErrorDetail(err2)}`);
+        }
+      } else {
+        throw new Error(`WooCommerce product update failed: ${msg}`);
+      }
     }
     return { action: 'updated', id };
   }
@@ -1061,6 +1327,17 @@ async function upsertWooProduct(
     const data = res.data as WooProduct;
     return { action: 'created', id: data.id };
   } catch (err) {
-    throw new Error(`WooCommerce product create failed: ${wooHttpErrorDetail(err)}`);
+    const msg = wooHttpErrorDetail(err);
+    if (isRemoteImageError(msg)) {
+      // Supplier blocks hotlinking — retry without images
+      try {
+        const res = await woo.post('products', payloadWithoutImages(payload));
+        const data = res.data as WooProduct;
+        return { action: 'created', id: data.id };
+      } catch (err2) {
+        throw new Error(`WooCommerce product create failed: ${wooHttpErrorDetail(err2)}`);
+      }
+    }
+    throw new Error(`WooCommerce product create failed: ${msg}`);
   }
 }

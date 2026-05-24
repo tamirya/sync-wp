@@ -11,31 +11,48 @@ services:
     restart: 'unless-stopped'
     networks:
       - backend
+
   server:
     build:
       context: ./
-      target: development-build-stage
+      target: production-build-stage
       dockerfile: Dockerfile
     container_name: server
     ports:
       - '3000:3000'
-    volumes:
-      - ./:/app
-      - /app/node_modules
+    env_file:
+      - .env.production.local
     restart: 'unless-stopped'
     networks:
       - backend
-    links:
-      - mongo
     depends_on:
-      - mongo
-  mongo:
-    image: mvertes/alpine-mongo
-    container_name: mongo
-    ports:
-      - '27017:27017'
+      - redis
+
+  worker:
+    build:
+      context: ./
+      target: production-build-stage
+      dockerfile: Dockerfile
+    container_name: worker
+    command: node dist/worker.js
+    env_file:
+      - .env.production.local
+    restart: 'unless-stopped'
     networks:
       - backend
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - '6379:6379'
+    restart: 'unless-stopped'
+    networks:
+      - backend
+    volumes:
+      - redis_data:/data
 
 networks:
   backend:
@@ -43,4 +60,6 @@ networks:
 
 volumes:
   data:
+    driver: local
+  redis_data:
     driver: local

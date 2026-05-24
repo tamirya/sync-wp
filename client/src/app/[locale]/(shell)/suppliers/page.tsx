@@ -1,6 +1,7 @@
 import type { Locale } from "@/i18n/config";
 import { isLocale } from "@/i18n/config";
 import { fetchSuppliersForUser } from "@/lib/suppliers-api";
+import { fetchActiveSupplierJobsMap } from "@/lib/jobs-api";
 import { getAppMessages } from "@/messages/app";
 import { notFound, redirect } from "next/navigation";
 import { SupplierGrid } from "./supplier-grid";
@@ -15,7 +16,10 @@ export default async function SuppliersPage({ params }: Props) {
   const locale = raw as Locale;
   const messages = getAppMessages(locale);
 
-  const result = await fetchSuppliersForUser();
+  const [result, activeJobs] = await Promise.all([
+    fetchSuppliersForUser(),
+    fetchActiveSupplierJobsMap(),
+  ]);
 
   if (!result.ok) {
     if (result.status === 401) {
@@ -44,7 +48,12 @@ export default async function SuppliersPage({ params }: Props) {
         </p>
       ) : null}
 
-      <SupplierGrid locale={locale} messages={messages} suppliers={suppliers} />
+      <SupplierGrid
+        locale={locale}
+        messages={messages}
+        suppliers={suppliers}
+        activeJobsBySupplierId={activeJobs}
+      />
     </div>
   );
 }

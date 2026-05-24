@@ -19,6 +19,8 @@ export type SupplierProductInfo = {
   name: string;
   sku: string;
   price: string | null;
+  /** True when the price has been overridden via price_overrides. */
+  isOverridden?: boolean;
 };
 
 /** Matches backend `ProductCategoryRule` from `GET /product-category-rules`. */
@@ -32,6 +34,8 @@ export type ProductMappingRule = {
   enabled: boolean;
   createdAt: string | null;
   updatedAt: string | null;
+  /** Embedded product info from the backend response (when available). */
+  embeddedProduct?: { name?: string; sku?: string } | null;
 };
 
 async function readJson<T>(res: Response): Promise<T | null> {
@@ -42,10 +46,18 @@ async function readJson<T>(res: Response): Promise<T | null> {
   }
 }
 
-/** Backend may return `{ data: [] }`, `{ products: [] }`, or other keys. */
+/** Backend may return `{ data: [] }`, `{ data: { products: [] } }`, `{ products: [] }`, or other keys. */
 function productArrayFromJson(json: Record<string, unknown> | null): unknown[] {
   if (!json) {
     return [];
+  }
+  // Handle paginated response shape: { data: { products: [], total, page, ... } }
+  const data = json["data"];
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const nested = data as Record<string, unknown>;
+    if (Array.isArray(nested["products"])) {
+      return nested["products"];
+    }
   }
   for (const key of [
     "data",
@@ -127,13 +139,50 @@ export async function fetchSupplierProductsForMapping(
   | { ok: false; status: number }
 > {
   try {
-    const res = await backendFetch(`/suppliers/${supplierId}/products`);
-    if (!res.ok) {
-      return { ok: false, status: res.status };
+    const PER_PAGE = 500;
+    const allProducts: ReturnType<typeof parseProductsFromApi> = [];
+
+    // Fetch the first page to discover totalPages.
+    const firstRes = await backendFetch(
+      `/suppliers/${supplierId}/products?perPage=${PER_PAGE}&page=1`,
+    );
+    if (!firstRes.ok) return { ok: false, status: firstRes.status };
+
+    const firstJson = await readJson<Record<string, unknown>>(firstRes);
+    allProducts.push(...parseProductsFromApi(productArrayFromJson(firstJson)));
+
+    // Try to read pagination metadata from the { data: { totalPages } } shape.
+    const dataBlock =
+      firstJson?.["data"] &&
+      typeof firstJson["data"] === "object" &&
+      !Array.isArray(firstJson["data"])
+        ? (firstJson["data"] as Record<string, unknown>)
+        : null;
+    const totalPages =
+      typeof dataBlock?.["totalPages"] === "number"
+        ? dataBlock["totalPages"]
+        : 1;
+
+    // Fetch remaining pages in parallel (cap at 20 pages = 10 000 products).
+    if (totalPages > 1) {
+      const pageNumbers = Array.from(
+        { length: Math.min(totalPages - 1, 19) },
+        (_, i) => i + 2,
+      );
+      const restResults = await Promise.all(
+        pageNumbers.map(async (page) => {
+          const res = await backendFetch(
+            `/suppliers/${supplierId}/products?perPage=${PER_PAGE}&page=${page}`,
+          );
+          if (!res.ok) return [];
+          const json = await readJson<Record<string, unknown>>(res);
+          return parseProductsFromApi(productArrayFromJson(json));
+        }),
+      );
+      for (const batch of restResults) allProducts.push(...batch);
     }
-    const json = await readJson<Record<string, unknown>>(res);
-    const products = parseProductsFromApi(productArrayFromJson(json));
-    return { ok: true, products };
+
+    return { ok: true, products: allProducts };
   } catch {
     return { ok: false, status: 401 };
   }
@@ -205,6 +254,20 @@ export async function fetchProductMappingRules(): Promise<
 
     const rules: ProductMappingRule[] = rawRules.map((r) => {
       const obj = r as Record<string, unknown>;
+      const productRaw =
+        obj.product && typeof obj.product === "object"
+          ? (obj.product as Record<string, unknown>)
+          : obj.sourceProduct && typeof obj.sourceProduct === "object"
+            ? (obj.sourceProduct as Record<string, unknown>)
+            : null;
+      const embeddedProduct = productRaw
+        ? {
+            name:
+              typeof productRaw.name === "string" ? productRaw.name : undefined,
+            sku:
+              typeof productRaw.sku === "string" ? productRaw.sku : undefined,
+          }
+        : null;
       return {
         id: Number(obj.id),
         storeId: Number(obj.storeId),
@@ -214,6 +277,7 @@ export async function fetchProductMappingRules(): Promise<
         enabled: Boolean(obj.enabled),
         createdAt: strOrNull(obj.createdAt),
         updatedAt: strOrNull(obj.updatedAt),
+        embeddedProduct,
       };
     });
 

@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import { spawn } from 'child_process';
 import { CreateSupplierDto } from '@dtos/suppliers.dto';
 import { HttpException } from '@exceptions/HttpException';
-import { col, fn, Op } from 'sequelize';
+import { col, fn, literal, Op, WhereOptions } from 'sequelize';
 import { Supplier, SupplierSummary } from '@interfaces/suppliers.interface';
 import SupplierModel from '@models/suppliers.model';
 import SupplierCatalogModel from '@models/supplierCatalog.model';
@@ -176,28 +176,51 @@ class SupplierService {
   }
 
   /** Products from `supplier_catalog` (run `POST /suppliers/:id/catalog/sync` to refresh from Store API). */
-  public async getSupplierProducts(supplierId: string, userId: number): Promise<StoreApiProduct[]> {
-    const supplier = await this.findSupplierById(supplierId, userId);
-    return this._mapCatalogRows(
-      await SupplierCatalogModel.findAll({
-        where: { supplierId: supplier.id },
-        order: [['sourceProductId', 'ASC']],
-      }),
-    );
-  }
-
-  /** Single endpoint that returns supplier + categories + products with one DB auth check. */
-  public async getSupplierFull(
+  public async getSupplierProducts(
     supplierId: string,
     userId: number,
-  ): Promise<{ supplier: Supplier; categories: StoreApiProductCategory[]; products: StoreApiProduct[] }> {
+    options?: { categoryId?: number; page?: number; perPage?: number },
+  ): Promise<{ products: StoreApiProduct[]; total: number; page: number; perPage: number; totalPages: number }> {
+    const supplier = await this.findSupplierById(supplierId, userId);
+    const perPage = Math.min(options?.perPage ?? 24, 200);
+    const page = Math.max(options?.page ?? 1, 1);
+    const offset = (page - 1) * perPage;
+
+    const where: WhereOptions = { supplierId: supplier.id };
+    if (options?.categoryId) {
+      (where as Record<string, unknown>)[Op.and as unknown as string] = literal(
+        `JSON_CONTAINS(JSON_EXTRACT(\`payload\`, '$.categories[*].id'), '${Number(options.categoryId)}')`,
+      );
+    }
+
+    const { count, rows } = await SupplierCatalogModel.findAndCountAll({
+      where,
+      order: [['sourceProductId', 'ASC']],
+      limit: perPage,
+      offset,
+    });
+
+    return {
+      products: this._mapCatalogRows(rows),
+      total: count as unknown as number,
+      page,
+      perPage,
+      totalPages: Math.ceil((count as unknown as number) / perPage),
+    };
+  }
+
+  /** Returns supplier + categories only (no products). Faster than getSupplierFull. */
+  public async getSupplierWithCategories(
+    supplierId: string,
+    userId: number,
+  ): Promise<{ supplier: Supplier; categories: StoreApiProductCategory[] }> {
     const supplier = await this.findSupplierById(supplierId, userId);
     const id = supplier.id;
 
-    const [categoryRows, catalogRows] = await Promise.all([
-      SupplierCategoryModel.findAll({ where: { supplierId: id }, order: [['sourceCategoryId', 'ASC']] }),
-      SupplierCatalogModel.findAll({ where: { supplierId: id }, order: [['sourceProductId', 'ASC']] }),
-    ]);
+    const categoryRows = await SupplierCategoryModel.findAll({
+      where: { supplierId: id },
+      order: [['sourceCategoryId', 'ASC']],
+    });
 
     const categories = categoryRows.map(r => {
       const plain = r.get({ plain: true });
@@ -219,6 +242,19 @@ class SupplierService {
       } as StoreApiProductCategory;
     });
 
+    return { supplier, categories };
+  }
+
+  /** Single endpoint that returns supplier + categories + products with one DB auth check. */
+  public async getSupplierFull(
+    supplierId: string,
+    userId: number,
+  ): Promise<{ supplier: Supplier; categories: StoreApiProductCategory[]; products: StoreApiProduct[] }> {
+    const { supplier, categories } = await this.getSupplierWithCategories(supplierId, userId);
+    const catalogRows = await SupplierCatalogModel.findAll({
+      where: { supplierId: supplier.id },
+      order: [['sourceProductId', 'ASC']],
+    });
     return { supplier, categories, products: this._mapCatalogRows(catalogRows) };
   }
 
@@ -512,10 +548,8 @@ class SupplierService {
 
   public async getSupplierLogo(supplierId: string, userId: number): Promise<{ logoUrl: string | null }> {
     const supplier = await this.findSupplierById(supplierId, userId);
-    const sourceUrl = supplier.url && String(supplier.url).trim();
-    if (!sourceUrl) return { logoUrl: null };
-    const logoUrl = await this.fetchLogoFromHomepage(sourceUrl);
-    return { logoUrl };
+    // Read from DB — logoUrl is populated during sync (syncSupplierCategories / syncSupplierViaScraper)
+    return { logoUrl: supplier.logoUrl ?? null };
   }
 }
 

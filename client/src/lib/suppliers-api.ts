@@ -40,16 +40,26 @@ export async function fetchSuppliersForUser(): Promise<
     return { ok: false, status: 401 };
   }
 
-  const res = await fetch(`${base}/suppliers`, {
-    headers: { Cookie: `${AUTH_JWT_COOKIE}=${token}` },
-    cache: "no-store",
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${base}/suppliers`, {
+      headers: { Cookie: `${AUTH_JWT_COOKIE}=${token}` },
+      cache: "no-store",
+    });
+  } catch {
+    return { ok: false, status: 503 };
+  }
 
   if (!res.ok) {
     return { ok: false, status: res.status };
   }
 
-  const json = (await res.json()) as ApiListResponse;
+  let json: ApiListResponse;
+  try {
+    json = (await res.json()) as ApiListResponse;
+  } catch {
+    return { ok: false, status: 502 };
+  }
   const rows = json.data ?? [];
 
   const suppliers: Omit<SupplierCardData, "logoUrl">[] = rows.map((s) => ({

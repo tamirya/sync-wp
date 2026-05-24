@@ -2,6 +2,7 @@ import { CreateProductCategoryRuleDto, UpdateProductCategoryRuleDto } from '@dto
 import { HttpException } from '@exceptions/HttpException';
 import { ProductCategoryRule } from '@interfaces/product-category-rules.interface';
 import ProductCategoryRuleModel from '@models/productCategoryRules.model';
+import PriceOverrideModel from '@models/priceOverride.model';
 import StoreModel from '@models/stores.model';
 import SupplierModel from '@models/suppliers.model';
 import { isEmpty } from '@utils/util';
@@ -80,6 +81,15 @@ class ProductCategoryRulesService {
     if (!row) throw new HttpException(409, "Product category rule doesn't exist");
     const plain = row.get({ plain: true });
     await row.destroy();
+    // Remove the associated price override (if any) for this product
+    await PriceOverrideModel.destroy({
+      where: {
+        userId,
+        supplierId: plain.supplierId,
+        type: 'product',
+        targetId: plain.sourceProductId,
+      },
+    });
     return plain;
   }
 }

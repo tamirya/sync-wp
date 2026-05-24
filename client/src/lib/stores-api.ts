@@ -47,16 +47,26 @@ export async function fetchStoresForUser(): Promise<
     return { ok: false, status: 401 };
   }
 
-  const res = await fetch(`${base}/stores`, {
-    headers: { Cookie: `${AUTH_JWT_COOKIE}=${token}` },
-    cache: "no-store",
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${base}/stores`, {
+      headers: { Cookie: `${AUTH_JWT_COOKIE}=${token}` },
+      cache: "no-store",
+    });
+  } catch {
+    return { ok: false, status: 503 };
+  }
 
   if (!res.ok) {
     return { ok: false, status: res.status };
   }
 
-  const json = (await res.json()) as ApiListResponse;
+  let json: ApiListResponse;
+  try {
+    json = (await res.json()) as ApiListResponse;
+  } catch {
+    return { ok: false, status: 502 };
+  }
   const rows = json.data ?? [];
 
   const stores: Omit<StoreCardData, "logoUrl">[] = rows.map((s) => ({

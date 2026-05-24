@@ -201,7 +201,7 @@ function StoreCardItem({
 
   return (
     <>
-      <article className="group flex flex-col rounded-[var(--radius-card)] border border-border/60 bg-card shadow-[var(--shadow-card)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-card-hover)]">
+      <article className="group flex flex-col rounded-[var(--radius-card)] border border-border/60 bg-card shadow-[var(--shadow-card)] transition-all duration-200 hover:shadow-[var(--shadow-card-hover)]">
         {/* Gradient header */}
         <div
           className={`relative h-24 w-full shrink-0 rounded-t-[var(--radius-card)] bg-gradient-to-br ${gradient}`}

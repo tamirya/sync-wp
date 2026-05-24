@@ -3,10 +3,13 @@ import { CreateSupplierDto } from '@dtos/suppliers.dto';
 import { RequestWithUser } from '@interfaces/auth.interface';
 import { Supplier, SupplierSummary } from '@interfaces/suppliers.interface';
 import supplierService from '@services/suppliers.service';
+import JobsService from '@services/jobs.service';
+import { supplierSyncQueue } from '@/queues';
 import { StoreApiProduct, StoreApiProductCategory } from '@services/store-catalog.service';
 
 class SuppliersController {
   public supplierService = new supplierService();
+  private jobsService = new JobsService();
 
   public getSuppliers = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
@@ -30,7 +33,10 @@ class SuppliersController {
   public getSupplierProducts = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
       const supplierId: string = req.params.id;
-      const data: StoreApiProduct[] = await this.supplierService.getSupplierProducts(supplierId, req.user.id);
+      const categoryId = req.query.categoryId ? Number(req.query.categoryId) : undefined;
+      const page = req.query.page ? Math.max(Number(req.query.page), 1) : 1;
+      const perPage = req.query.perPage ? Math.min(Number(req.query.perPage), 200) : 24;
+      const data = await this.supplierService.getSupplierProducts(supplierId, req.user.id, { categoryId, page, perPage });
       res.status(200).json({ data, message: 'products' });
     } catch (error) {
       next(error);
@@ -40,8 +46,16 @@ class SuppliersController {
   public syncSupplierCategories = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
       const supplierId: string = req.params.id;
-      const data = await this.supplierService.syncSupplierCategories(supplierId, req.user.id);
-      res.status(200).json({ data, message: 'categoriesSynced' });
+      await this.supplierService.findSupplierById(supplierId, req.user.id);
+
+      if (await this.jobsService.hasActiveJob('supplier_categories', Number(supplierId))) {
+        res.status(409).json({ message: 'A sync job for this supplier is already running' });
+        return;
+      }
+
+      const job = await this.jobsService.createJob('supplier_categories', Number(supplierId), req.user.id);
+      await supplierSyncQueue.add('categories', { jobId: job.id, supplierId, userId: req.user.id });
+      res.status(202).json({ data: { jobId: job.id }, message: 'categoriesSyncQueued' });
     } catch (error) {
       next(error);
     }
@@ -50,8 +64,16 @@ class SuppliersController {
   public syncSupplierCatalog = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
       const supplierId: string = req.params.id;
-      const data = await this.supplierService.syncSupplierCatalog(supplierId, req.user.id);
-      res.status(200).json({ data, message: 'catalogSynced' });
+      await this.supplierService.findSupplierById(supplierId, req.user.id);
+
+      if (await this.jobsService.hasActiveJob('supplier_catalog', Number(supplierId))) {
+        res.status(409).json({ message: 'A sync job for this supplier is already running' });
+        return;
+      }
+
+      const job = await this.jobsService.createJob('supplier_catalog', Number(supplierId), req.user.id);
+      await supplierSyncQueue.add('catalog', { jobId: job.id, supplierId, userId: req.user.id });
+      res.status(202).json({ data: { jobId: job.id }, message: 'catalogSyncQueued' });
     } catch (error) {
       next(error);
     }
@@ -62,6 +84,16 @@ class SuppliersController {
       const supplierId: string = req.params.id;
       const data = await this.supplierService.getSupplierFull(supplierId, req.user.id);
       res.status(200).json({ data, message: 'full' });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public getSupplierWithCategories = async (req: RequestWithUser, res: Response, next: NextFunction) => {
+    try {
+      const supplierId: string = req.params.id;
+      const data = await this.supplierService.getSupplierWithCategories(supplierId, req.user.id);
+      res.status(200).json({ data, message: 'withCategories' });
     } catch (error) {
       next(error);
     }
@@ -81,8 +113,16 @@ class SuppliersController {
     try {
       const supplierId: string = req.params.id;
       const skipProducts = req.query.skipProducts === 'true';
-      const data = await this.supplierService.syncSupplierViaScraper(supplierId, req.user.id, skipProducts);
-      res.status(200).json({ data, message: 'scraperSynced' });
+      await this.supplierService.findSupplierById(supplierId, req.user.id);
+
+      if (await this.jobsService.hasActiveJob('supplier_scraper', Number(supplierId))) {
+        res.status(409).json({ message: 'A scraper job for this supplier is already running' });
+        return;
+      }
+
+      const job = await this.jobsService.createJob('supplier_scraper', Number(supplierId), req.user.id);
+      await supplierSyncQueue.add('scraper', { jobId: job.id, supplierId, userId: req.user.id, skipProducts });
+      res.status(202).json({ data: { jobId: job.id }, message: 'scraperSyncQueued' });
     } catch (error) {
       next(error);
     }
