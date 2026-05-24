@@ -29,8 +29,13 @@ class AuthService {
     const findUser = await this.users.findOne({ where: { email: userData.email } });
     if (!findUser) throw new HttpException(409, `This email ${userData.email} was not found`);
 
-    const isPasswordMatching: boolean = await compare(userData.password, findUser.password);
-    if (!isPasswordMatching) throw new HttpException(409, "Password is not matching");
+    const storedHash = findUser.getDataValue('password');
+    if (!userData.password || !storedHash) {
+      throw new HttpException(401, 'Invalid email or password');
+    }
+
+    const isPasswordMatching: boolean = await compare(userData.password, storedHash);
+    if (!isPasswordMatching) throw new HttpException(401, 'Invalid email or password');
 
     const tokenData = this.createToken(findUser.get({ plain: true }));
     const cookie = this.createCookie(tokenData);
