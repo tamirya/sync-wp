@@ -17,13 +17,13 @@ export interface CategoryRuleAttributes {
 export type CategoryRuleCreationAttributes = Optional<CategoryRuleAttributes, 'id' | 'enabled'>;
 
 class CategoryRuleModel extends Model<CategoryRuleAttributes, CategoryRuleCreationAttributes> implements CategoryRuleAttributes {
-  public id!: number;
-  public userId!: number;
-  public storeId!: number;
-  public supplierId!: number;
-  public supplierCategoryId!: number;
-  public storeCategoryId!: number;
-  public enabled!: boolean;
+  declare id: number;
+  declare userId: number;
+  declare storeId: number;
+  declare supplierId: number;
+  declare supplierCategoryId: number;
+  declare storeCategoryId: number;
+  declare enabled: boolean;
 }
 
 CategoryRuleModel.init(

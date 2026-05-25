@@ -10,9 +10,9 @@ export interface UserAttributes {
 export type UserCreationAttributes = Optional<UserAttributes, 'id'>;
 
 class UserModel extends Model<UserAttributes, UserCreationAttributes> implements UserAttributes {
-  public id!: number;
-  public email!: string;
-  public password!: string;
+  declare id: number;
+  declare email: string;
+  declare password: string;
 }
 
 UserModel.init(

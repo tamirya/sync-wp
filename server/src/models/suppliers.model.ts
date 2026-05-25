@@ -13,11 +13,11 @@ export interface SupplierAttributes {
 export type SupplierCreationAttributes = Optional<SupplierAttributes, 'id' | 'logoUrl'>;
 
 class SupplierModel extends Model<SupplierAttributes, SupplierCreationAttributes> implements SupplierAttributes {
-  public id!: number;
-  public userId!: number;
-  public name!: string;
-  public url!: string;
-  public logoUrl!: string | null;
+  declare id: number;
+  declare userId: number;
+  declare name: string;
+  declare url: string;
+  declare logoUrl: string | null;
 }
 
 SupplierModel.init(

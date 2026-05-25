@@ -12,10 +12,10 @@ export interface EnvToStoreAttributes {
 export type EnvToStoreCreationAttributes = Optional<EnvToStoreAttributes, 'id'>;
 
 class EnvToStoreModel extends Model<EnvToStoreAttributes, EnvToStoreCreationAttributes> implements EnvToStoreAttributes {
-  public id!: number;
-  public storeId!: number;
-  public consumerKey!: string;
-  public consumerSecret!: string;
+  declare id: number;
+  declare storeId: number;
+  declare consumerKey: string;
+  declare consumerSecret: string;
 }
 
 EnvToStoreModel.init(

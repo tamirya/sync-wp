@@ -20,13 +20,13 @@ export type SupplierCategoryCreationAttributes = Optional<
 class SupplierCategoryModel extends Model<SupplierCategoryAttributes, SupplierCategoryCreationAttributes>
   implements SupplierCategoryAttributes
 {
-  public id!: number;
-  public supplierId!: number;
-  public sourceCategoryId!: number;
-  public parent!: number | null;
-  public name!: string;
-  public slug!: string;
-  public payload!: object | null;
+  declare id: number;
+  declare supplierId: number;
+  declare sourceCategoryId: number;
+  declare parent: number | null;
+  declare name: string;
+  declare slug: string;
+  declare payload: object | null;
 }
 
 SupplierCategoryModel.init(

@@ -21,15 +21,15 @@ export type StoreCatalogCreationAttributes = Optional<
 >;
 
 class StoreCatalogModel extends Model<StoreCatalogAttributes, StoreCatalogCreationAttributes> implements StoreCatalogAttributes {
-  public id!: number;
-  public storeId!: number;
-  public wooProductId!: number;
-  public sku!: string;
-  public name!: string | null;
-  public sourceSupplierId!: number | null;
-  public sourceProductId!: number | null;
-  public payload!: object | null;
-  public categories!: string[] | null;
+  declare id: number;
+  declare storeId: number;
+  declare wooProductId: number;
+  declare sku: string;
+  declare name: string | null;
+  declare sourceSupplierId: number | null;
+  declare sourceProductId: number | null;
+  declare payload: object | null;
+  declare categories: string[] | null;
 }
 
 StoreCatalogModel.init(

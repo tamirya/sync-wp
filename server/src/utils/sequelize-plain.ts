@@ -1,13 +1,10 @@
 import type { Model } from 'sequelize';
 
-/**
- * Serialize a Sequelize model for JSON responses.
- * Avoids TypeScript `public field!` declarations shadowing `get({ plain: true })`.
- */
-export function modelToPlain<T extends Record<string, unknown> = Record<string, unknown>>(instance: Model): T {
-  return { ...(instance.dataValues as T) };
+/** Plain object from Sequelize `dataValues` (avoids public class-field shadowing). */
+export function modelToPlain<T extends object>(instance: Model): T {
+  return { ...instance.dataValues } as T;
 }
 
-export function modelsToPlain<T extends Record<string, unknown> = Record<string, unknown>>(instances: Model[]): T[] {
+export function modelsToPlain<T extends object>(instances: Model[]): T[] {
   return instances.map(instance => modelToPlain<T>(instance));
 }

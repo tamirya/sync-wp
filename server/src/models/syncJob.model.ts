@@ -30,14 +30,14 @@ export interface SyncJobAttributes {
 export type SyncJobCreationAttributes = Optional<SyncJobAttributes, 'progress' | 'result' | 'error' | 'createdAt' | 'updatedAt'>;
 
 class SyncJobModel extends Model<SyncJobAttributes, SyncJobCreationAttributes> implements SyncJobAttributes {
-  public id!: string;
-  public type!: SyncJobType;
-  public entityId!: number;
-  public userId!: number;
-  public status!: SyncJobStatus;
-  public progress!: number;
-  public result!: object | null;
-  public error!: string | null;
+  declare id: string;
+  declare type: SyncJobType;
+  declare entityId: number;
+  declare userId: number;
+  declare status: SyncJobStatus;
+  declare progress: number;
+  declare result: object | null;
+  declare error: string | null;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }

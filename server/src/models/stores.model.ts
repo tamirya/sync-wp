@@ -15,12 +15,12 @@ export interface StoreAttributes {
 export type StoreCreationAttributes = Optional<StoreAttributes, 'id' | 'port' | 'logoUrl'>;
 
 class StoreModel extends Model<StoreAttributes, StoreCreationAttributes> implements StoreAttributes {
-  public id!: number;
-  public userId!: number;
-  public name!: string;
-  public url!: string;
-  public port!: number | null;
-  public logoUrl!: string | null;
+  declare id: number;
+  declare userId: number;
+  declare name: string;
+  declare url: string;
+  declare port: number | null;
+  declare logoUrl: string | null;
 }
 
 StoreModel.init(

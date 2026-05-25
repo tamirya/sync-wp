@@ -21,14 +21,14 @@ export type StoreCategoryCreationAttributes = Optional<
 class StoreCategoryModel extends Model<StoreCategoryAttributes, StoreCategoryCreationAttributes>
   implements StoreCategoryAttributes
 {
-  public id!: number;
-  public storeId!: number;
-  public wooCategoryId!: number;
-  public parent!: number | null;
-  public name!: string;
-  public slug!: string;
-  public count!: number | null;
-  public payload!: object | null;
+  declare id: number;
+  declare storeId: number;
+  declare wooCategoryId: number;
+  declare parent: number | null;
+  declare name: string;
+  declare slug: string;
+  declare count: number | null;
+  declare payload: object | null;
 }
 
 StoreCategoryModel.init(

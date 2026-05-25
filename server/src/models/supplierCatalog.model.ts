@@ -16,14 +16,14 @@ export interface SupplierCatalogAttributes {
 export type SupplierCatalogCreationAttributes = Optional<SupplierCatalogAttributes, 'id' | 'name' | 'payload' | 'skuOriginal' | 'categories'>;
 
 class SupplierCatalogModel extends Model<SupplierCatalogAttributes, SupplierCatalogCreationAttributes> implements SupplierCatalogAttributes {
-  public id!: number;
-  public supplierId!: number;
-  public sourceProductId!: number;
-  public skuOriginal!: string | null;
-  public sku!: string;
-  public name!: string | null;
-  public payload!: object | null;
-  public categories!: string[] | null;
+  declare id: number;
+  declare supplierId: number;
+  declare sourceProductId: number;
+  declare skuOriginal: string | null;
+  declare sku: string;
+  declare name: string | null;
+  declare payload: object | null;
+  declare categories: string[] | null;
 }
 
 SupplierCatalogModel.init(

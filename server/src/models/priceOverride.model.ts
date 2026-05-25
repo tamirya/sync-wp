@@ -29,13 +29,13 @@ class PriceOverrideModel
   extends Model<PriceOverrideAttributes, PriceOverrideCreationAttributes>
   implements PriceOverrideAttributes
 {
-  public id!: number;
-  public userId!: number;
-  public supplierId!: number;
-  public type!: PriceOverrideType;
-  public targetId!: number;
-  public markupPercent!: number;
-  public useSalePrices!: boolean;
+  declare id: number;
+  declare userId: number;
+  declare supplierId: number;
+  declare type: PriceOverrideType;
+  declare targetId: number;
+  declare markupPercent: number;
+  declare useSalePrices: boolean;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }

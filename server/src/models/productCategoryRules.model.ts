@@ -19,13 +19,13 @@ export type ProductCategoryRuleCreationAttributes = Optional<ProductCategoryRule
 class ProductCategoryRuleModel extends Model<ProductCategoryRuleAttributes, ProductCategoryRuleCreationAttributes>
   implements ProductCategoryRuleAttributes
 {
-  public id!: number;
-  public userId!: number;
-  public storeId!: number;
-  public supplierId!: number;
-  public sourceProductId!: number;
-  public storeCategoryId!: number;
-  public enabled!: boolean;
+  declare id: number;
+  declare userId: number;
+  declare storeId: number;
+  declare supplierId: number;
+  declare sourceProductId: number;
+  declare storeCategoryId: number;
+  declare enabled: boolean;
 }
 
 ProductCategoryRuleModel.init(

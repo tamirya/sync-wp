@@ -108,8 +108,8 @@ export async function createStoreAction(
 
   let storeId: number;
   try {
-    const j = (await storeRes.json()) as { data?: { id?: number } };
-    storeId = j.data?.id ?? 0;
+    const j = (await storeRes.json()) as { data?: { id?: number | string } };
+    storeId = Number(j.data?.id ?? 0);
   } catch {
     return { message: messages(locale).errorInvalidServerResponse };
   }
