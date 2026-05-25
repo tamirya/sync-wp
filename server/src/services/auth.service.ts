@@ -7,6 +7,7 @@ import { DataStoredInToken, TokenData } from '@interfaces/auth.interface';
 import { User } from '@interfaces/users.interface';
 import userModel from '@models/users.model';
 import { isEmpty } from '@utils/util';
+import { modelToPlain } from '@utils/sequelize-plain';
 
 class AuthService {
   public users = userModel;
@@ -20,7 +21,7 @@ class AuthService {
     const hashedPassword = await hash(userData.password, 10);
     const createUserData = await this.users.create({ ...userData, password: hashedPassword });
 
-    return createUserData.get({ plain: true });
+    return modelToPlain<User>(createUserData);
   }
 
   public async login(userData: CreateUserDto): Promise<{ cookie: string; findUser: User }> {
@@ -37,10 +38,11 @@ class AuthService {
     const isPasswordMatching: boolean = await compare(userData.password, storedHash);
     if (!isPasswordMatching) throw new HttpException(401, 'Invalid email or password');
 
-    const tokenData = this.createToken(findUser.get({ plain: true }));
+    const plainUser = modelToPlain<User>(findUser);
+    const tokenData = this.createToken(plainUser);
     const cookie = this.createCookie(tokenData);
 
-    return { cookie, findUser: findUser.get({ plain: true }) };
+    return { cookie, findUser: plainUser };
   }
 
   public async logout(userData: User): Promise<User> {
@@ -49,7 +51,7 @@ class AuthService {
     const findUser = await this.users.findOne({ where: { email: userData.email, password: userData.password } });
     if (!findUser) throw new HttpException(409, `This email ${userData.email} was not found`);
 
-    return findUser.get({ plain: true });
+    return modelToPlain<User>(findUser);
   }
 
   public createToken(user: User): TokenData {

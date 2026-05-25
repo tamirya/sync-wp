@@ -4,6 +4,8 @@ import { SECRET_KEY } from '@config';
 import { HttpException } from '@exceptions/HttpException';
 import { DataStoredInToken, RequestWithUser } from '@interfaces/auth.interface';
 import userModel from '@models/users.model';
+import { modelToPlain } from '@utils/sequelize-plain';
+import type { User } from '@interfaces/users.interface';
 
 const authMiddleware = async (req: RequestWithUser, res: Response, next: NextFunction) => {
   try {
@@ -16,7 +18,7 @@ const authMiddleware = async (req: RequestWithUser, res: Response, next: NextFun
       const findUser = await userModel.findByPk(userId);
 
       if (findUser) {
-        req.user = findUser.get({ plain: true });
+        req.user = modelToPlain<User>(findUser);
         next();
       } else {
         next(new HttpException(401, 'Wrong authentication token'));

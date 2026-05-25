@@ -28,6 +28,7 @@ import {
   StoreRulesSyncImportResult,
 } from '@services/store-catalog.service';
 import { isEmpty } from '@utils/util';
+import { modelToPlain, modelsToPlain } from '@utils/sequelize-plain';
 
 type WooRestClient = InstanceType<typeof WooCommerceRestApi>;
 
@@ -95,7 +96,7 @@ class StoreService {
   private categoryRulesService = new CategoryRulesService();
   public async findAllStores(userId: number): Promise<StoreSummary[]> {
     const rows = await this.stores.findAll({ where: { userId } });
-    const stores = rows.map(r => r.get({ plain: true }) as Store);
+    const stores = modelsToPlain<Store>(rows);
     if (stores.length === 0) {
       return [];
     }
@@ -609,14 +610,14 @@ class StoreService {
     const store = await this.stores.findOne({ where: { id, userId } });
     if (!store) throw new HttpException(409, "Store doesn't exist");
 
-    return store.get({ plain: true });
+    return modelToPlain<Store>(store);
   }
 
   public async createStore(storeData: CreateStoreDto, userId: number): Promise<Store> {
     if (isEmpty(storeData)) throw new HttpException(400, 'storeData is empty');
 
     const created = await this.stores.create({ ...storeData, userId });
-    return created.get({ plain: true });
+    return modelToPlain<Store>(created);
   }
 
   public async updateStore(storeId: string, storeData: CreateStoreDto, userId: number): Promise<Store> {
@@ -635,7 +636,7 @@ class StoreService {
     });
 
     await store.reload();
-    return store.get({ plain: true });
+    return modelToPlain<Store>(store);
   }
 
   public async deleteStore(storeId: string, userId: number): Promise<Store> {
@@ -645,7 +646,7 @@ class StoreService {
     const store = await this.stores.findOne({ where: { id, userId } });
     if (!store) throw new HttpException(409, "Store doesn't exist");
 
-    const plain = store.get({ plain: true });
+    const plain = modelToPlain<Store>(store);
     await store.destroy();
     return plain;
   }

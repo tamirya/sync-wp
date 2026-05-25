@@ -4,9 +4,10 @@ import { EnvToStore } from '@interfaces/envToStore.interface';
 import EnvToStoreModel from '@models/envToStore.model';
 import StoreModel from '@models/stores.model';
 import { isEmpty } from '@utils/util';
+import { modelToPlain, modelsToPlain } from '@utils/sequelize-plain';
 
 function plainEnvToStore(row: EnvToStoreModel): EnvToStore {
-  const p = row.get({ plain: true }) as EnvToStore & { Store?: unknown; store?: unknown };
+  const p = modelToPlain<EnvToStore & { Store?: unknown; store?: unknown }>(row);
   delete p.Store;
   delete p.store;
   return p;
