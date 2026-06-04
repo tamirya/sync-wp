@@ -5,8 +5,12 @@ export type StoreApiPricesLike = {
   currency_minor_unit: number;
 };
 
+export type PricingMode = 'percent' | 'fixed_amount';
+
 export type MarkupOverride = {
+  pricingMode?: PricingMode;
   markupPercent: number;
+  fixedAmount?: number | null;
   useSalePrices: boolean;
 };
 
@@ -53,7 +57,21 @@ export function effectivePriceFromStoreApi(
 export function applyMarkupPercent(base: number, markupPercent: number): number {
   const pct = Number(markupPercent);
   const safePct = Number.isFinite(pct) ? pct : 0;
-  return Math.round(base * (1 + safePct / 100) * 100) / 100;
+  return Math.max(0, Math.round(base * (1 + safePct / 100) * 100) / 100);
+}
+
+export function applyFixedAmount(base: number, fixedAmount: number): number {
+  const amt = Number(fixedAmount);
+  const safeAmt = Number.isFinite(amt) ? amt : 0;
+  return Math.max(0, Math.round((base + safeAmt) * 100) / 100);
+}
+
+export function applyPriceOverride(base: number, override: MarkupOverride): number {
+  if (base == null || base <= 0) return 0;
+  if (override.pricingMode === 'fixed_amount') {
+    return applyFixedAmount(base, override.fixedAmount ?? 0);
+  }
+  return applyMarkupPercent(base, override.markupPercent);
 }
 
 export function formatWooPrice(n: number): string {
@@ -86,7 +104,6 @@ export function buildMarkedUpWooPrices(
   onSale: boolean,
   override: MarkupOverride,
 ): { regular_price: string; sale_price: string } {
-  const markup = Number(override.markupPercent) || 0;
   const { regular } = storeApiPricesToMajor(prices, onSale);
   const base = override.useSalePrices
     ? supplierDisplayPriceMajor(prices, onSale)
@@ -99,7 +116,7 @@ export function buildMarkedUpWooPrices(
   }
 
   return {
-    regular_price: formatWooPrice(applyMarkupPercent(base, markup)),
+    regular_price: formatWooPrice(applyPriceOverride(base, override)),
     sale_price: '',
   };
 }

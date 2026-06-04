@@ -1,9 +1,18 @@
 import { HttpException } from '@exceptions/HttpException';
-import PriceOverrideModel, { PriceOverrideAttributes, PriceOverrideType } from '@models/priceOverride.model';
+import PriceOverrideModel, {
+  PriceOverrideAttributes,
+  PriceOverrideType,
+  PricingMode,
+} from '@models/priceOverride.model';
 import SupplierCategoryModel from '@models/supplierCategory.model';
 import SupplierModel from '@models/suppliers.model';
 
-export type PriceOverrideResult = { markupPercent: number; useSalePrices: boolean };
+export type PriceOverrideResult = {
+  pricingMode: PricingMode;
+  markupPercent: number;
+  fixedAmount: number | null;
+  useSalePrices: boolean;
+};
 
 /** Returns markup settings for a product, or null if no override applies. */
 export type PriceOverrideResolver = (sourceProductId: number, categoryIds: number[]) => PriceOverrideResult | null;
@@ -14,13 +23,24 @@ class PriceOverrideService {
     supplierId: number,
     type: PriceOverrideType,
     targetId: number,
+    pricingMode: PricingMode,
     markupPercent: number,
+    fixedAmount: number | null,
     useSalePrices: boolean,
   ): Promise<PriceOverrideAttributes> {
     await this.validateSupplierOwnership(supplierId, userId);
 
     const [row] = await PriceOverrideModel.upsert(
-      { userId, supplierId, type, targetId, markupPercent, useSalePrices },
+      {
+        userId,
+        supplierId,
+        type,
+        targetId,
+        pricingMode,
+        markupPercent,
+        fixedAmount,
+        useSalePrices,
+      },
       { returning: true },
     );
     return row.get({ plain: true });
@@ -34,6 +54,22 @@ class PriceOverrideService {
       order: [['type', 'ASC'], ['targetId', 'ASC']],
     });
     return rows.map(r => r.get({ plain: true }));
+  }
+
+  public async deleteOverride(
+    userId: number,
+    supplierId: number,
+    type: PriceOverrideType,
+    targetId: number,
+  ): Promise<void> {
+    await this.validateSupplierOwnership(supplierId, userId);
+
+    const removed = await PriceOverrideModel.destroy({
+      where: { userId, supplierId, type, targetId },
+    });
+    if (removed === 0) {
+      throw new HttpException(404, 'Price override not found');
+    }
   }
 
   /**
@@ -57,7 +93,9 @@ class PriceOverrideService {
     for (const o of overrides) {
       const plain = o.get({ plain: true });
       const data: PriceOverrideResult = {
+        pricingMode: plain.pricingMode === 'fixed_amount' ? 'fixed_amount' : 'percent',
         markupPercent: Number(plain.markupPercent),
+        fixedAmount: plain.fixedAmount != null ? Number(plain.fixedAmount) : null,
         useSalePrices: Boolean(plain.useSalePrices),
       };
       const targetId = Number(plain.targetId);

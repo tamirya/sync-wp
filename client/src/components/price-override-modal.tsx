@@ -1,20 +1,28 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { upsertPriceOverrideAction } from "@/app/actions/upsert-price-override";
+import { upsertPriceOverrideAction, deletePriceOverrideAction } from "@/app/actions/upsert-price-override";
 import { fetchCategoryProductsForPricingAction } from "@/app/actions/fetch-category-products-for-pricing";
+import { ConfirmModal } from "@/components/confirm-modal";
 import {
+  adjustFixedAmount,
   adjustMarkupPercent,
   computeMinPrice,
   effectiveProductPrice,
+  formatFixedAmountLabel,
   formatMarkupLabel,
-  previewPriceWithMarkup,
+  isValidPriceOverride,
+  normalizePriceOverride,
+  previewPriceWithOverride,
   type PriceOverride,
+  type PricingMode,
   type ProductPriceFields,
 } from "@/lib/price-utils";
 
 export type PriceOverrideModalMessages = {
   priceOverrideModalTitle: string;
+  priceOverrideTargetCategory: string;
+  priceOverrideTargetProduct: string;
   priceOverrideSupplierPrice: string;
   priceOverrideSupplierPriceMin: string;
   priceOverrideIncludeSalePrices: string;
@@ -24,11 +32,24 @@ export type PriceOverrideModalMessages = {
   priceOverridePreviewLabel: string;
   priceOverrideMarkup10: string;
   priceOverrideMarkup20: string;
+  priceOverrideModePercent: string;
+  priceOverrideModeFixedAmount: string;
+  priceOverrideFixedAmountLabel: string;
+  priceOverrideFixedAmount5: string;
+  priceOverrideFixedAmountMinus5: string;
   priceOverrideSave: string;
   priceOverrideCancel: string;
   priceOverrideSaving: string;
   priceOverrideSaved: string;
   priceOverrideError: string;
+  priceOverrideRemove: string;
+  priceOverrideRemoving: string;
+  priceOverrideRemoved: string;
+  priceOverrideRemoveConfirm: string;
+  priceOverrideEditAria: string;
+  priceOverrideRemoveAria: string;
+  confirmYes: string;
+  confirmNo: string;
 };
 
 type Props = {
@@ -44,6 +65,7 @@ type Props = {
   supplierDisplayPrice?: number | null;
   messages: PriceOverrideModalMessages;
   onSaved?: (override: PriceOverride) => void;
+  onRemoved?: () => void;
 };
 
 export function PriceOverrideModal({
@@ -52,21 +74,20 @@ export function PriceOverrideModal({
   supplierId,
   type,
   targetId,
-  targetName,
+  targetName: _targetName,
   currentOverride,
   supplierRegularPrice,
   supplierSalePrice,
   supplierDisplayPrice,
   messages,
   onSaved,
+  onRemoved,
 }: Props) {
-  const [markupPercent, setMarkupPercent] = useState(
-    currentOverride?.markupPercent ?? 0,
-  );
-  const [useSalePrices, setUseSalePrices] = useState(
-    currentOverride?.useSalePrices ?? false,
-  );
-  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
+  const [pricingMode, setPricingMode] = useState<PricingMode>("percent");
+  const [markupPercent, setMarkupPercent] = useState(0);
+  const [fixedAmount, setFixedAmount] = useState(0);
+  const [useSalePrices, setUseSalePrices] = useState(false);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error" | "removing" | "removed">(
     "idle",
   );
   const [categoryProducts, setCategoryProducts] = useState<ProductPriceFields[]>(
@@ -74,13 +95,25 @@ export function PriceOverrideModal({
   );
   const [loadingBase, setLoadingBase] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
+  const [dir, setDir] = useState<"rtl" | "ltr">("rtl");
 
   useEffect(() => {
     if (open) {
-      setMarkupPercent(currentOverride?.markupPercent ?? 0);
-      setUseSalePrices(currentOverride?.useSalePrices ?? false);
+      setDir(document.documentElement.dir === "ltr" ? "ltr" : "rtl");
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (open) {
+      const normalized = normalizePriceOverride(currentOverride ?? {});
+      setPricingMode(normalized.pricingMode);
+      setMarkupPercent(normalized.markupPercent);
+      setFixedAmount(normalized.fixedAmount);
+      setUseSalePrices(normalized.useSalePrices);
       setStatus("idle");
       setErrorMsg("");
+      setRemoveConfirmOpen(false);
     }
   }, [open, currentOverride]);
 
@@ -123,13 +156,31 @@ export function PriceOverrideModal({
     useSalePrices,
   ]);
 
-  const previewPrice = previewPriceWithMarkup(basePrice, markupPercent);
+  const draftOverride = useMemo(
+    (): PriceOverride => ({
+      pricingMode,
+      markupPercent,
+      fixedAmount,
+      useSalePrices,
+    }),
+    [pricingMode, markupPercent, fixedAmount, useSalePrices],
+  );
+
+  const previewPrice = previewPriceWithOverride(basePrice, draftOverride);
+  const valueLabel =
+    pricingMode === "fixed_amount"
+      ? formatFixedAmountLabel(fixedAmount)
+      : formatMarkupLabel(markupPercent);
+  const adjustmentLabel =
+    pricingMode === "fixed_amount"
+      ? messages.priceOverrideFixedAmountLabel
+      : messages.priceOverrideMarkupLabel;
 
   if (!open) return null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!Number.isFinite(markupPercent) || markupPercent < 0) return;
+    if (!isValidPriceOverride(draftOverride)) return;
 
     setStatus("saving");
     setErrorMsg("");
@@ -137,13 +188,16 @@ export function PriceOverrideModal({
     const result = await upsertPriceOverrideAction(supplierId, {
       type,
       targetId,
-      markupPercent,
-      useSalePrices,
+      pricingMode: draftOverride.pricingMode,
+      markupPercent: draftOverride.pricingMode === "percent" ? draftOverride.markupPercent : 0,
+      fixedAmount:
+        draftOverride.pricingMode === "fixed_amount" ? draftOverride.fixedAmount : null,
+      useSalePrices: draftOverride.useSalePrices,
     });
 
     if (result.ok) {
       setStatus("saved");
-      onSaved?.({ markupPercent, useSalePrices });
+      onSaved?.(draftOverride);
       setTimeout(onClose, 800);
     } else {
       setStatus("error");
@@ -152,6 +206,25 @@ export function PriceOverrideModal({
   }
 
   const isSaving = status === "saving";
+  const isBusy = isSaving || status === "removing";
+
+  async function executeRemove() {
+    if (!currentOverride) return;
+
+    setRemoveConfirmOpen(false);
+    setStatus("removing");
+    setErrorMsg("");
+
+    const result = await deletePriceOverrideAction(supplierId, { type, targetId });
+    if (result.ok) {
+      setStatus("removed");
+      onRemoved?.();
+      setTimeout(onClose, 600);
+    } else {
+      setStatus("error");
+      setErrorMsg(result.message);
+    }
+  }
 
   return (
     <div
@@ -162,13 +235,14 @@ export function PriceOverrideModal({
     >
       <div className="relative w-full max-w-sm rounded-2xl bg-card shadow-2xl ring-1 ring-border/60 p-6">
         <div className="mb-5">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-muted">
-            {type === "product" ? "Product" : "Category"}
-          </p>
-          <h2 className="mt-1 text-lg font-bold text-foreground leading-snug">
+          <h2 className="text-lg font-bold text-foreground leading-snug">
             {messages.priceOverrideModalTitle}
           </h2>
-          <p className="mt-0.5 text-sm text-muted line-clamp-1">{targetName}</p>
+          <p className="mt-0.5 text-sm text-muted line-clamp-1">
+            {type === "product"
+              ? messages.priceOverrideTargetProduct
+              : messages.priceOverrideTargetCategory}
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -191,7 +265,7 @@ export function PriceOverrideModal({
               <input
                 type="checkbox"
                 checked={useSalePrices}
-                disabled={isSaving || loadingBase}
+                disabled={isBusy || loadingBase}
                 onChange={(e) => setUseSalePrices(e.target.checked)}
                 className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary/30"
               />
@@ -199,54 +273,119 @@ export function PriceOverrideModal({
             </label>
           </div>
 
+          <div className="grid grid-cols-2 gap-2 rounded-xl border border-border bg-background p-1">
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={() => setPricingMode("percent")}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                pricingMode === "percent"
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-muted hover:bg-muted-bg hover:text-foreground"
+              }`}
+            >
+              {messages.priceOverrideModePercent}
+            </button>
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={() => setPricingMode("fixed_amount")}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                pricingMode === "fixed_amount"
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-muted hover:bg-muted-bg hover:text-foreground"
+              }`}
+            >
+              {messages.priceOverrideModeFixedAmount}
+            </button>
+          </div>
+
           <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-center">
-            <p className="text-xs font-semibold text-muted">
-              {messages.priceOverrideMarkupLabel}
-            </p>
-            <p className="mt-1 text-2xl font-bold text-primary">
-              {formatMarkupLabel(markupPercent)}
+            <p className="text-xs font-semibold text-muted">{adjustmentLabel}</p>
+            <p dir="ltr" className="mt-1 text-2xl font-bold text-primary tabular-nums">
+              {valueLabel}
             </p>
             {previewPrice && (
               <p className="mt-1 text-xs text-muted">
-                {messages.priceOverridePreviewLabel}: {previewPrice}
+                {messages.priceOverridePreviewLabel}:{" "}
+                <span dir="ltr" className="font-semibold text-foreground">
+                  {previewPrice}
+                </span>
               </p>
             )}
           </div>
 
-          <div className="grid grid-cols-4 gap-2">
-            <button
-              type="button"
-              onClick={() => setMarkupPercent((p) => adjustMarkupPercent(p, -1))}
-              disabled={isSaving}
-              className="rounded-xl border border-border bg-card px-2 py-2 text-sm font-semibold text-foreground transition hover:bg-muted-bg disabled:opacity-50"
-            >
-              −
-            </button>
-            <button
-              type="button"
-              onClick={() => setMarkupPercent((p) => adjustMarkupPercent(p, 1))}
-              disabled={isSaving}
-              className="rounded-xl border border-border bg-card px-2 py-2 text-sm font-semibold text-foreground transition hover:bg-muted-bg disabled:opacity-50"
-            >
-              +
-            </button>
-            <button
-              type="button"
-              onClick={() => setMarkupPercent(10)}
-              disabled={isSaving}
-              className="rounded-xl border border-border bg-card px-2 py-2 text-xs font-semibold text-foreground transition hover:bg-muted-bg disabled:opacity-50"
-            >
-              {messages.priceOverrideMarkup10}
-            </button>
-            <button
-              type="button"
-              onClick={() => setMarkupPercent(20)}
-              disabled={isSaving}
-              className="rounded-xl border border-border bg-card px-2 py-2 text-xs font-semibold text-foreground transition hover:bg-muted-bg disabled:opacity-50"
-            >
-              {messages.priceOverrideMarkup20}
-            </button>
-          </div>
+          {pricingMode === "percent" ? (
+            <div className="grid grid-cols-4 gap-2">
+              <button
+                type="button"
+                onClick={() => setMarkupPercent((p) => adjustMarkupPercent(p, -1))}
+                disabled={isBusy}
+                className="rounded-xl border border-border bg-card px-2 py-2 text-sm font-semibold text-foreground transition hover:bg-muted-bg disabled:opacity-50"
+              >
+                −
+              </button>
+              <button
+                type="button"
+                onClick={() => setMarkupPercent((p) => adjustMarkupPercent(p, 1))}
+                disabled={isBusy}
+                className="rounded-xl border border-border bg-card px-2 py-2 text-sm font-semibold text-foreground transition hover:bg-muted-bg disabled:opacity-50"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                onClick={() => setMarkupPercent(10)}
+                disabled={isBusy}
+                className="rounded-xl border border-border bg-card px-2 py-2 text-xs font-semibold text-foreground transition hover:bg-muted-bg disabled:opacity-50"
+              >
+                {messages.priceOverrideMarkup10}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMarkupPercent(20)}
+                disabled={isBusy}
+                className="rounded-xl border border-border bg-card px-2 py-2 text-xs font-semibold text-foreground transition hover:bg-muted-bg disabled:opacity-50"
+              >
+                {messages.priceOverrideMarkup20}
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-4 gap-2">
+              <button
+                type="button"
+                onClick={() => setFixedAmount((v) => adjustFixedAmount(v, -1))}
+                disabled={isBusy}
+                className="rounded-xl border border-border bg-card px-2 py-2 text-sm font-semibold text-foreground transition hover:bg-muted-bg disabled:opacity-50"
+              >
+                −
+              </button>
+              <button
+                type="button"
+                onClick={() => setFixedAmount((v) => adjustFixedAmount(v, 1))}
+                disabled={isBusy}
+                className="rounded-xl border border-border bg-card px-2 py-2 text-sm font-semibold text-foreground transition hover:bg-muted-bg disabled:opacity-50"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                onClick={() => setFixedAmount((v) => adjustFixedAmount(v, -5))}
+                disabled={isBusy}
+                className="rounded-xl border border-border bg-card px-2 py-2 text-xs font-semibold text-foreground transition hover:bg-muted-bg disabled:opacity-50"
+              >
+                {messages.priceOverrideFixedAmountMinus5}
+              </button>
+              <button
+                type="button"
+                onClick={() => setFixedAmount((v) => adjustFixedAmount(v, 5))}
+                disabled={isBusy}
+                className="rounded-xl border border-border bg-card px-2 py-2 text-xs font-semibold text-foreground transition hover:bg-muted-bg disabled:opacity-50"
+              >
+                {messages.priceOverrideFixedAmount5}
+              </button>
+            </div>
+          )}
 
           {status === "error" && (
             <p className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600 ring-1 ring-red-200">
@@ -254,19 +393,37 @@ export function PriceOverrideModal({
               {errorMsg ? `: ${errorMsg}` : ""}
             </p>
           )}
+          {status === "removed" && (
+            <p className="rounded-xl bg-green-50 px-3 py-2 text-xs text-green-700 ring-1 ring-green-200">
+              {messages.priceOverrideRemoved}
+            </p>
+          )}
+
+          {currentOverride ? (
+            <button
+              type="button"
+              onClick={() => setRemoveConfirmOpen(true)}
+              disabled={isBusy}
+              className="w-full rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100 disabled:opacity-50"
+            >
+              {status === "removing"
+                ? messages.priceOverrideRemoving
+                : messages.priceOverrideRemove}
+            </button>
+          ) : null}
 
           <div className="flex gap-2 pt-1">
             <button
               type="button"
               onClick={onClose}
-              disabled={isSaving}
+              disabled={isBusy}
               className="flex-1 rounded-xl border border-border px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-muted-bg disabled:opacity-50"
             >
               {messages.priceOverrideCancel}
             </button>
             <button
               type="submit"
-              disabled={isSaving}
+              disabled={isBusy}
               className="flex-1 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:opacity-60"
             >
               {status === "saving"
@@ -280,7 +437,7 @@ export function PriceOverrideModal({
 
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-full text-muted/60 transition hover:bg-muted-bg hover:text-foreground"
+          className="absolute end-4 top-4 flex h-7 w-7 items-center justify-center rounded-full text-muted/60 transition hover:bg-muted-bg hover:text-foreground"
           aria-label={messages.priceOverrideCancel}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
@@ -288,6 +445,17 @@ export function PriceOverrideModal({
           </svg>
         </button>
       </div>
+
+      <ConfirmModal
+        open={removeConfirmOpen}
+        dir={dir}
+        title={messages.priceOverrideRemove}
+        message={messages.priceOverrideRemoveConfirm}
+        labelConfirm={messages.confirmYes}
+        labelCancel={messages.confirmNo}
+        onConfirm={executeRemove}
+        onCancel={() => setRemoveConfirmOpen(false)}
+      />
     </div>
   );
 }

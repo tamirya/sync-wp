@@ -4,6 +4,7 @@ import UserModel from './users.model';
 import SupplierModel from './suppliers.model';
 
 export type PriceOverrideType = 'product' | 'category';
+export type PricingMode = 'percent' | 'fixed_amount';
 
 export interface PriceOverrideAttributes {
   id: number;
@@ -12,10 +13,14 @@ export interface PriceOverrideAttributes {
   type: PriceOverrideType;
   /** sourceProductId (when type='product') or sourceCategoryId (when type='category') */
   targetId: number;
-  /** Markup applied on each product's supplier base price at sync time (e.g. 10 = +10%). */
+  /** Markup applied on each product's supplier base price at sync time (e.g. 10 = +10%, -5 = -5%). */
   markupPercent: number;
   /** When true, use supplier sale price as base when available. */
   useSalePrices: boolean;
+  /** percent = markupPercent; fixed_amount = add fixedAmount currency to each product base. */
+  pricingMode: PricingMode;
+  /** Currency adjustment when pricingMode is fixed_amount (e.g. 5 = +₪5, -2 = -₪2). */
+  fixedAmount: number | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -36,6 +41,8 @@ class PriceOverrideModel
   declare targetId: number;
   declare markupPercent: number;
   declare useSalePrices: boolean;
+  declare pricingMode: PricingMode;
+  declare fixedAmount: number | null;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -78,6 +85,16 @@ PriceOverrideModel.init(
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: false,
+    },
+    pricingMode: {
+      type: DataTypes.ENUM('percent', 'fixed_amount'),
+      allowNull: false,
+      defaultValue: 'percent',
+    },
+    fixedAmount: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      defaultValue: null,
     },
   },
   {

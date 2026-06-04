@@ -4,6 +4,7 @@ import { isLocale, type Locale } from "@/i18n/config";
 import { notFound, redirect } from "next/navigation";
 import { backendFetch } from "@/lib/backend-fetch";
 import { getAppMessages, pickPriceOverrideMessages } from "@/messages/app";
+import { normalizePriceOverride, type PriceOverride } from "@/lib/price-utils";
 import { formatWooStorePriceFromFields } from "@/lib/mapping-tree-utils";
 import {
   SupplierCatPageClient,
@@ -121,7 +122,9 @@ function parseWooProducts(data: unknown): ParsedProduct[] {
 type PriceOverrideRaw = {
   type: "product" | "category";
   targetId: number;
+  pricingMode?: "percent" | "fixed_amount";
   markupPercent: number;
+  fixedAmount?: number | null;
   useSalePrices: boolean;
 };
 
@@ -235,19 +238,10 @@ export default async function SupplierCategoryProductsPage({ params, searchParam
       fetchPriceOverrides(id),
     ]);
 
-  const productOverrideMap = new Map<
-    number,
-    { markupPercent: number; useSalePrices: boolean }
-  >();
-  const categoryOverrideMap = new Map<
-    number,
-    { markupPercent: number; useSalePrices: boolean }
-  >();
+  const productOverrideMap = new Map<number, PriceOverride>();
+  const categoryOverrideMap = new Map<number, PriceOverride>();
   for (const o of priceOverrides) {
-    const val = {
-      markupPercent: Number(o.markupPercent),
-      useSalePrices: o.useSalePrices !== false,
-    };
+    const val = normalizePriceOverride(o);
     if (o.type === "product") productOverrideMap.set(o.targetId, val);
     else categoryOverrideMap.set(o.targetId, val);
   }
@@ -435,8 +429,8 @@ export default async function SupplierCategoryProductsPage({ params, searchParam
           syncModalLoadingCategories: messages.syncModalLoadingCategories,
           syncModalNoStores: messages.syncModalNoStores,
           syncModalNoCategories: messages.syncModalNoCategories,
-          confirmNo: messages.confirmNo,
           priceOverrideButton: messages.priceOverrideButton,
+          mappingProductPrice: messages.mappingProductPrice,
           ...pickPriceOverrideMessages(messages),
         }}
       />

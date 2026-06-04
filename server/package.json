@@ -9,11 +9,12 @@
     "typescript-express-mongoose-starter": "./bin/cli.js"
   },
   "scripts": {
-    "start": "npm run build && cross-env NODE_ENV=production node dist/server.js",
-    "start:worker": "npm run build && cross-env NODE_ENV=production node dist/worker.js",
+    "start": "cross-env NODE_ENV=production node dist/server.js",
+    "start:worker": "cross-env NODE_ENV=production node dist/worker.js",
     "dev": "cross-env NODE_ENV=development nodemon",
     "dev:worker": "cross-env NODE_ENV=development nodemon --config nodemon.worker.json",
     "db:sync": "cross-env NODE_ENV=development ts-node -r tsconfig-paths/register --transpile-only src/scripts/sync-db.ts",
+    "db:sync:prod": "node dist/scripts/sync-db.js",
     "db:sync:safe": "cross-env NODE_ENV=development DB_SYNC_ALTER=false ts-node -r tsconfig-paths/register --transpile-only src/scripts/sync-db.ts",
     "db:sync:category-rules": "cross-env NODE_ENV=development ts-node -r tsconfig-paths/register --transpile-only src/scripts/sync-category-rules.ts",
     "db:sync:product-category-rules": "cross-env NODE_ENV=development ts-node -r tsconfig-paths/register --transpile-only src/scripts/sync-product-category-rules.ts",
@@ -22,6 +23,7 @@
     "db:sync:sync-jobs": "cross-env NODE_ENV=development ts-node -r tsconfig-paths/register --transpile-only src/scripts/sync-sync-jobs.ts",
     "db:sync:price-overrides": "cross-env NODE_ENV=development ts-node -r tsconfig-paths/register --transpile-only src/scripts/sync-price-overrides.ts",
     "db:migrate:price-overrides": "cross-env NODE_ENV=development ts-node -r tsconfig-paths/register --transpile-only src/scripts/migrate-price-overrides-markup.ts",
+    "db:migrate:price-overrides-pricing-mode": "cross-env NODE_ENV=development ts-node -r tsconfig-paths/register --transpile-only src/scripts/migrate-price-overrides-pricing-mode.ts",
     "build": "swc src -d dist --source-maps --copy-files",
     "build:tsc": "tsc && tsc-alias",
     "test": "jest --forceExit --detectOpenHandles",

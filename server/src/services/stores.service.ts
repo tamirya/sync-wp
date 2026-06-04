@@ -6,7 +6,15 @@ import { SyncStoreRulesImportDto } from '@dtos/sync-store-rules-import.dto';
 import { SyncSingleRuleImportDto } from '@dtos/sync-single-rule-import.dto';
 import { CreateStoreDto } from '@dtos/stores.dto';
 import { HttpException } from '@exceptions/HttpException';
-import { Store, StoreProductCategory, StoreSummary, StoreWooProduct } from '@interfaces/stores.interface';
+import {
+  Store,
+  StoreCategorySyncRuleRef,
+  StoreProductCategory,
+  StoreProductSyncRuleRef,
+  StoreProductSyncSource,
+  StoreSummary,
+  StoreWooProduct,
+} from '@interfaces/stores.interface';
 import CategoryRuleModel from '@models/categoryRules.model';
 import ProductCategoryRuleModel from '@models/productCategoryRules.model';
 import StoreModel from '@models/stores.model';
@@ -14,6 +22,8 @@ import StoreCatalogModel from '@models/storeCatalog.model';
 import SupplierModel from '@models/suppliers.model';
 import StoreCategoryModel from '@models/storeCategory.model';
 import SupplierCatalogModel from '@models/supplierCatalog.model';
+import SupplierCategoryModel from '@models/supplierCategory.model';
+import PriceOverrideModel from '@models/priceOverride.model';
 import EnvToStoreService from '@services/envToStore.service';
 import SupplierService from '@services/suppliers.service';
 import CategoryRulesService from '@services/category-rules.service';
@@ -27,6 +37,12 @@ import {
   StoreApiImportResult,
   StoreRulesSyncImportResult,
 } from '@services/store-catalog.service';
+import {
+  formatWooPrice,
+  normalizePricesFromCatalogPayload,
+  storeApiPricesToMajor,
+  supplierDisplayPriceMajor,
+} from '@utils/price-markup';
 import { isEmpty } from '@utils/util';
 import { modelToPlain, modelsToPlain } from '@utils/sequelize-plain';
 
@@ -179,20 +195,173 @@ class StoreService {
       order: [['wooCategoryId', 'ASC']],
     });
 
+    const [categoryRules, productRules] = await Promise.all([
+      CategoryRuleModel.findAll({
+        where: { userId, storeId: id },
+        attributes: ['id', 'supplierId', 'storeCategoryId', 'supplierCategoryId', 'enabled'],
+      }),
+      ProductCategoryRuleModel.findAll({
+        where: { userId, storeId: id },
+        attributes: ['id', 'supplierId', 'storeCategoryId', 'sourceProductId', 'enabled'],
+      }),
+    ]);
+
+    const supplierIds = new Set<number>();
+    for (const r of categoryRules) supplierIds.add(r.supplierId);
+    for (const r of productRules) supplierIds.add(r.supplierId);
+
+    const supplierNameById = new Map<number, string>();
+    const supplierCategoryNameByKey = new Map<string, string>();
+    const supplierProductNameByKey = new Map<string, string>();
+    const priceOverrideByKey = new Map<
+      string,
+      {
+        pricingMode: 'percent' | 'fixed_amount';
+        markupPercent: number;
+        fixedAmount: number | null;
+        useSalePrices: boolean;
+      }
+    >();
+
+    if (supplierIds.size > 0) {
+      const supplierIdList = [...supplierIds];
+
+      const categoryLookupKeys = categoryRules.map(r => {
+        const plain = r.get({ plain: true });
+        return { supplierId: plain.supplierId, sourceCategoryId: plain.supplierCategoryId };
+      });
+      const productLookupKeys = productRules.map(r => {
+        const plain = r.get({ plain: true });
+        return { supplierId: plain.supplierId, sourceProductId: plain.sourceProductId };
+      });
+
+      const [suppliers, supplierCategories, supplierProducts, priceOverrides] = await Promise.all([
+        SupplierModel.findAll({
+          where: { id: { [Op.in]: supplierIdList }, userId },
+          attributes: ['id', 'name'],
+        }),
+        categoryLookupKeys.length > 0
+          ? SupplierCategoryModel.findAll({
+              where: { [Op.or]: categoryLookupKeys.map(k => ({ supplierId: k.supplierId, sourceCategoryId: k.sourceCategoryId })) },
+              attributes: ['supplierId', 'sourceCategoryId', 'name'],
+            })
+          : Promise.resolve([]),
+        productLookupKeys.length > 0
+          ? SupplierCatalogModel.findAll({
+              where: { [Op.or]: productLookupKeys.map(k => ({ supplierId: k.supplierId, sourceProductId: k.sourceProductId })) },
+              attributes: ['supplierId', 'sourceProductId', 'name'],
+            })
+          : Promise.resolve([]),
+        PriceOverrideModel.findAll({
+          where: { userId, supplierId: { [Op.in]: supplierIdList } },
+          attributes: ['supplierId', 'type', 'targetId', 'pricingMode', 'markupPercent', 'fixedAmount', 'useSalePrices'],
+        }),
+      ]);
+
+      for (const s of suppliers) {
+        supplierNameById.set(s.id, s.name);
+      }
+      for (const c of supplierCategories) {
+        const plain = c.get({ plain: true });
+        supplierCategoryNameByKey.set(`${plain.supplierId}:${plain.sourceCategoryId}`, plain.name);
+      }
+      for (const p of supplierProducts) {
+        const plain = p.get({ plain: true });
+        if (plain.name) {
+          supplierProductNameByKey.set(`${plain.supplierId}:${plain.sourceProductId}`, plain.name);
+        }
+      }
+      for (const o of priceOverrides) {
+        const plain = o.get({ plain: true });
+        priceOverrideByKey.set(`${plain.supplierId}:${plain.type}:${plain.targetId}`, {
+          pricingMode: plain.pricingMode === 'fixed_amount' ? 'fixed_amount' : 'percent',
+          markupPercent: Number(plain.markupPercent),
+          fixedAmount: plain.fixedAmount != null ? Number(plain.fixedAmount) : null,
+          useSalePrices: Boolean(plain.useSalePrices),
+        });
+      }
+    }
+
+    const rulesByStoreCategoryId = new Map<number, StoreCategorySyncRuleRef[]>();
+
+    const pushRule = (storeCategoryId: number, rule: StoreCategorySyncRuleRef) => {
+      const list = rulesByStoreCategoryId.get(storeCategoryId) ?? [];
+      list.push(rule);
+      rulesByStoreCategoryId.set(storeCategoryId, list);
+    };
+
+    const attachPriceOverride = (
+      supplierId: number,
+      type: 'category' | 'product',
+      targetId: number,
+    ): Pick<
+      StoreCategorySyncRuleRef,
+      'pricingMode' | 'markupPercent' | 'fixedAmount' | 'useSalePrices'
+    > => {
+      const hit = priceOverrideByKey.get(`${supplierId}:${type}:${targetId}`);
+      if (!hit) return {};
+      return {
+        pricingMode: hit.pricingMode,
+        markupPercent: hit.markupPercent,
+        fixedAmount: hit.fixedAmount,
+        useSalePrices: hit.useSalePrices,
+      };
+    };
+
+    for (const r of categoryRules) {
+      const plain = r.get({ plain: true });
+      const supplierName = supplierNameById.get(plain.supplierId);
+      if (!supplierName) continue;
+      pushRule(plain.storeCategoryId, {
+        id: plain.id,
+        type: 'category',
+        enabled: plain.enabled,
+        supplierId: plain.supplierId,
+        supplierName,
+        supplierCategoryId: plain.supplierCategoryId,
+        supplierCategoryName:
+          supplierCategoryNameByKey.get(`${plain.supplierId}:${plain.supplierCategoryId}`) ?? null,
+        ...attachPriceOverride(plain.supplierId, 'category', plain.supplierCategoryId),
+      });
+    }
+
+    for (const r of productRules) {
+      const plain = r.get({ plain: true });
+      const supplierName = supplierNameById.get(plain.supplierId);
+      if (!supplierName) continue;
+      pushRule(plain.storeCategoryId, {
+        id: plain.id,
+        type: 'product',
+        enabled: plain.enabled,
+        supplierId: plain.supplierId,
+        supplierName,
+        sourceProductId: plain.sourceProductId,
+        sourceProductName:
+          supplierProductNameByKey.get(`${plain.supplierId}:${plain.sourceProductId}`) ?? null,
+        ...attachPriceOverride(plain.supplierId, 'product', plain.sourceProductId),
+      });
+    }
+
     return rows.map(r => {
       const plain = r.get({ plain: true });
+      const syncRules = rulesByStoreCategoryId.get(plain.wooCategoryId) ?? [];
+
       if (plain.payload && typeof plain.payload === 'object' && !Array.isArray(plain.payload)) {
         const base = { ...(plain.payload as Record<string, unknown>) };
         base.id = plain.wooCategoryId;
-        return base as unknown as StoreProductCategory;
+        const category = base as unknown as StoreProductCategory;
+        if (syncRules.length > 0) category.syncRules = syncRules;
+        return category;
       }
-      return {
+      const category: StoreProductCategory = {
         id: plain.wooCategoryId,
         name: plain.name,
         slug: plain.slug,
         parent: plain.parent ?? 0,
         ...(plain.count != null ? { count: plain.count } : {}),
-      } as StoreProductCategory;
+      };
+      if (syncRules.length > 0) category.syncRules = syncRules;
+      return category;
     });
   }
 
@@ -431,6 +600,59 @@ class StoreService {
     return { attempted: rows.length, removedFromCatalog, failed };
   }
 
+  private buildSupplierPricesFromPayload(payload: object | null): Pick<
+    StoreProductSyncSource,
+    'regularPrice' | 'salePrice' | 'displayPrice' | 'onSale'
+  > {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return { regularPrice: null, salePrice: null, displayPrice: null, onSale: false };
+    }
+    const p = payload as Record<string, unknown>;
+    const prices = normalizePricesFromCatalogPayload(p);
+    const onSaleFlag = Boolean(p.on_sale);
+    const onSale =
+      onSaleFlag ||
+      (Boolean(prices.sale_price) &&
+        prices.sale_price !== '0' &&
+        prices.sale_price !== prices.regular_price &&
+        prices.sale_price !== prices.price);
+    const { regular, sale } = storeApiPricesToMajor(prices, onSale);
+    const hasSale = sale != null && regular > 0 && sale > 0 && sale < regular;
+    const displayMajor = supplierDisplayPriceMajor(prices, onSale);
+
+    return {
+      regularPrice: regular > 0 ? formatWooPrice(regular) : null,
+      salePrice: hasSale ? formatWooPrice(sale) : null,
+      displayPrice: displayMajor != null && displayMajor > 0 ? formatWooPrice(displayMajor) : null,
+      onSale: hasSale,
+    };
+  }
+
+  private resolveSyncRulesForProduct(
+    supplierId: number,
+    sourceProductId: number,
+    supplierCategoryIds: number[],
+    productRuleMap: Map<string, { id: number; enabled: boolean }>,
+    categoryRuleMap: Map<string, { id: number; enabled: boolean }>,
+  ): StoreProductSyncRuleRef[] {
+    const rules: StoreProductSyncRuleRef[] = [];
+
+    const productRule = productRuleMap.get(`${supplierId}:${sourceProductId}`);
+    if (productRule) {
+      rules.push({ id: productRule.id, type: 'product', enabled: productRule.enabled });
+    }
+
+    for (const catId of supplierCategoryIds) {
+      const categoryRule = categoryRuleMap.get(`${supplierId}:${catId}`);
+      if (categoryRule) {
+        rules.push({ id: categoryRule.id, type: 'category', enabled: categoryRule.enabled });
+        break;
+      }
+    }
+
+    return rules;
+  }
+
   /** Products from `store_catalog` (run `POST /stores/:id/catalog/sync` to refresh from Woo). */
   public async getAllStoreProducts(storeId: string, userId: number): Promise<StoreWooProduct[]> {
     await this.findStoreById(storeId, userId);
@@ -442,11 +664,115 @@ class StoreService {
       order: [['wooProductId', 'ASC']],
     });
 
+    if (rows.length === 0) return [];
+
+    const supplierIds = new Set<number>();
+    const catalogLookupKeys: { supplierId: number; sourceProductId: number }[] = [];
+
+    for (const r of rows) {
+      const plain = r.get({ plain: true });
+      if (plain.sourceSupplierId != null && plain.sourceProductId != null) {
+        supplierIds.add(plain.sourceSupplierId);
+        catalogLookupKeys.push({
+          supplierId: plain.sourceSupplierId,
+          sourceProductId: plain.sourceProductId,
+        });
+      }
+    }
+
+    const supplierNameById = new Map<number, string>();
+    if (supplierIds.size > 0) {
+      const suppliers = await SupplierModel.findAll({
+        where: { id: { [Op.in]: [...supplierIds] }, userId },
+        attributes: ['id', 'name'],
+      });
+      for (const s of suppliers) {
+        supplierNameById.set(s.id, s.name);
+      }
+    }
+
+    const supplierCatalogByKey = new Map<
+      string,
+      { payload: object | null; categories: string[] | null }
+    >();
+    if (catalogLookupKeys.length > 0) {
+      const catalogRows = await SupplierCatalogModel.findAll({
+        where: {
+          [Op.or]: catalogLookupKeys.map(k => ({
+            supplierId: k.supplierId,
+            sourceProductId: k.sourceProductId,
+          })),
+        },
+        attributes: ['supplierId', 'sourceProductId', 'payload', 'categories'],
+      });
+      for (const c of catalogRows) {
+        const plain = c.get({ plain: true });
+        supplierCatalogByKey.set(`${plain.supplierId}:${plain.sourceProductId}`, {
+          payload: plain.payload,
+          categories: plain.categories,
+        });
+      }
+    }
+
+    const [categoryRules, productRules] = await Promise.all([
+      CategoryRuleModel.findAll({ where: { userId, storeId: id }, attributes: ['id', 'supplierId', 'supplierCategoryId', 'enabled'] }),
+      ProductCategoryRuleModel.findAll({
+        where: { userId, storeId: id },
+        attributes: ['id', 'supplierId', 'sourceProductId', 'enabled'],
+      }),
+    ]);
+
+    const productRuleMap = new Map<string, { id: number; enabled: boolean }>();
+    for (const r of productRules) {
+      const plain = r.get({ plain: true });
+      productRuleMap.set(`${plain.supplierId}:${plain.sourceProductId}`, {
+        id: plain.id,
+        enabled: plain.enabled,
+      });
+    }
+
+    const categoryRuleMap = new Map<string, { id: number; enabled: boolean }>();
+    for (const r of categoryRules) {
+      const plain = r.get({ plain: true });
+      categoryRuleMap.set(`${plain.supplierId}:${plain.supplierCategoryId}`, {
+        id: plain.id,
+        enabled: plain.enabled,
+      });
+    }
+
     return rows.map(r => {
       const plain = r.get({ plain: true });
       const base =
         plain.payload && typeof plain.payload === 'object' && !Array.isArray(plain.payload) ? { ...(plain.payload as Record<string, unknown>) } : {};
-      return { ...base, id: plain.wooProductId } as StoreWooProduct;
+      const product: StoreWooProduct = { ...base, id: plain.wooProductId };
+
+      if (plain.sourceSupplierId != null && plain.sourceProductId != null) {
+        const supplierName = supplierNameById.get(plain.sourceSupplierId);
+        if (supplierName) {
+          const catalogKey = `${plain.sourceSupplierId}:${plain.sourceProductId}`;
+          const catalogRow = supplierCatalogByKey.get(catalogKey);
+          const supplierCategoryIds = (catalogRow?.categories ?? [])
+            .map(c => Number(c))
+            .filter(n => Number.isFinite(n));
+
+          const syncSource: StoreProductSyncSource = {
+            supplierId: plain.sourceSupplierId,
+            supplierName,
+            sourceProductId: plain.sourceProductId,
+            ...this.buildSupplierPricesFromPayload(catalogRow?.payload ?? null),
+            rules: this.resolveSyncRulesForProduct(
+              plain.sourceSupplierId,
+              plain.sourceProductId,
+              supplierCategoryIds,
+              productRuleMap,
+              categoryRuleMap,
+            ),
+          };
+          product.syncSource = syncSource;
+        }
+      }
+
+      return product;
     });
   }
 

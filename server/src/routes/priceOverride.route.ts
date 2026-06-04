@@ -14,6 +14,7 @@ class PriceOverrideRoute implements Routes {
   private initializeRoutes() {
     this.router.get('/suppliers/:supplierId/price-overrides', authMiddleware, this.controller.getOverrides);
     this.router.post('/suppliers/:supplierId/price-overrides', authMiddleware, this.controller.upsertOverride);
+    this.router.delete('/suppliers/:supplierId/price-overrides', authMiddleware, this.controller.deleteOverride);
   }
 }
 

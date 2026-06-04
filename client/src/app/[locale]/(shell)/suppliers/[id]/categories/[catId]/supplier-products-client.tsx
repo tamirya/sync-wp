@@ -296,16 +296,18 @@ export function SupplierProductsClient({
                     )}
                   </div>
 
-                  <button
-                    onClick={() => toggle(product.id)}
-                    className={`w-full rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
-                      isSelected
-                        ? "bg-primary text-white shadow-sm hover:bg-primary/90"
-                        : "border border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-                    }`}
-                  >
-                    {isSelected ? messages.selectedLabel : messages.selectLabel}
-                  </button>
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => toggle(product.id)}
+                      className={`h-8 shrink-0 rounded-lg px-3 text-xs font-semibold transition-all ${
+                        isSelected
+                          ? "bg-primary text-white shadow-sm hover:bg-primary/90"
+                          : "border border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                      }`}
+                    >
+                      {isSelected ? messages.selectedLabel : messages.selectLabel}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

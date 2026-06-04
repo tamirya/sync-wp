@@ -3,9 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { Locale } from "@/i18n/config";
+import { parseSupplierNavPath } from "@/lib/supplier-nav-utils";
 import type { AppMessages } from "@/messages/app";
+import { SupplierCategorySidebarPanel } from "@/components/supplier-category-sidebar-panel";
 
 function NavIcon({
   active,
@@ -174,6 +176,8 @@ type Props = {
 export function AppShell({ locale, messages, children }: Props) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [footerOpen, setFooterOpen] = useState(true);
+  const [categoryPanelOpen, setCategoryPanelOpen] = useState(true);
 
   const prefix = `/${locale}`;
   const nav = [
@@ -203,13 +207,52 @@ export function AppShell({ locale, messages, children }: Props) {
     return pathname === href || pathname.startsWith(`${href}/`);
   }
 
+  const supplierNav = parseSupplierNavPath(pathname, locale);
+  const suppliersNavHref = `${prefix}/suppliers`;
+  const sidebarWidth = supplierNav ? "w-72" : "w-[17.5rem]";
+
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.assign(`${prefix}/login`);
   }
 
+  function renderNavLink({
+    href,
+    label,
+    icon,
+  }: {
+    href: string;
+    label: string;
+    icon: ReactNode;
+  }) {
+    const active = isActive(href);
+    return (
+      <Link
+        key={href}
+        href={href}
+        onClick={() => setMobileOpen(false)}
+        className={`flex items-center gap-3 rounded-xl border-e-[3px] px-3 py-2.5 text-sm font-medium transition-colors ${
+          active
+            ? "border-e-primary bg-shell-sidebar-active text-primary shadow-sm"
+            : "border-e-transparent text-shell-sidebar-foreground hover:bg-shell-sidebar-accent"
+        }`}
+      >
+        <NavIcon active={active}>{icon}</NavIcon>
+        <span className="min-w-0 flex-1 text-start leading-snug">{label}</span>
+      </Link>
+    );
+  }
+
+  const suppliersNavIndex = nav.findIndex((item) => item.href === suppliersNavHref);
+  const navBeforeSuppliers =
+    suppliersNavIndex >= 0 ? nav.slice(0, suppliersNavIndex) : nav;
+  const navFromSuppliers =
+    suppliersNavIndex >= 0 ? nav.slice(suppliersNavIndex) : [];
+
   const sidebar = (
-    <aside className="flex h-full w-[17.5rem] shrink-0 flex-col border-shell-sidebar-border bg-shell-sidebar shadow-[2px_0_24px_rgba(15,23,42,0.04)] md:border-e">
+    <aside
+      className={`flex h-full ${sidebarWidth} shrink-0 flex-col border-shell-sidebar-border bg-shell-sidebar shadow-[2px_0_24px_rgba(15,23,42,0.04)] md:border-e`}
+    >
       <div className="border-b border-shell-sidebar-border px-5 py-6">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl shadow-sm ring-1 ring-black/5">
@@ -229,51 +272,106 @@ export function AppShell({ locale, messages, children }: Props) {
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-0.5 p-3" aria-label="Main">
-        {nav.map(({ href, label, icon }) => {
-          const active = isActive(href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-3 rounded-xl border-e-[3px] px-3 py-2.5 text-sm font-medium transition-colors ${
-                active
-                  ? "border-e-primary bg-shell-sidebar-active text-primary shadow-sm"
-                  : "border-e-transparent text-shell-sidebar-foreground hover:bg-shell-sidebar-accent"
-              }`}
+      <div className="flex min-h-0 flex-1 flex-col">
+        {supplierNav ? (
+          <>
+            <nav
+              className="flex shrink-0 flex-col gap-0.5 p-3 pb-2"
+              aria-label="Main"
             >
-              <NavIcon active={active}>{icon}</NavIcon>
-              <span className="min-w-0 flex-1 text-start leading-snug">
-                {label}
-              </span>
-            </Link>
-          );
-        })}
-      </nav>
+              {navBeforeSuppliers.map(({ href, label, icon }) =>
+                renderNavLink({ href, label, icon }),
+              )}
+              {navFromSuppliers.length > 0
+                ? renderNavLink(navFromSuppliers[0]!)
+                : null}
+            </nav>
 
-      <div className="border-t border-shell-sidebar-border p-4">
-        <Link
-          href={`${prefix}/stores/new`}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-md transition hover:brightness-110"
-        >
-          <span className="text-lg leading-none">+</span>
-          {messages.addStore}
-        </Link>
-        <Link
-          href={`${prefix}/suppliers/new`}
-          className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-shell-sidebar-border bg-shell-sidebar px-4 py-2.5 text-sm font-semibold text-primary transition hover:bg-shell-sidebar-accent"
-        >
-          <span className="text-lg leading-none">+</span>
-          {messages.addSupplierShort}
-        </Link>
+            <div
+              className={
+                categoryPanelOpen
+                  ? "min-h-0 flex-1 overflow-y-auto border-y border-shell-sidebar-border px-2 py-2"
+                  : "shrink-0 border-y border-shell-sidebar-border px-2 py-2"
+              }
+            >
+              <SupplierCategorySidebarPanel
+                locale={locale}
+                supplierId={supplierNav.supplierId}
+                activeCategoryId={supplierNav.categoryId}
+                messages={messages}
+                onNavigate={() => setMobileOpen(false)}
+                onOpenChange={setCategoryPanelOpen}
+              />
+            </div>
+
+            <nav className="flex shrink-0 flex-col gap-0.5 p-3 pt-2">
+              {navFromSuppliers.slice(1).map(({ href, label, icon }) =>
+                renderNavLink({ href, label, icon }),
+              )}
+            </nav>
+          </>
+        ) : (
+          <nav
+            className="flex flex-1 flex-col gap-0.5 p-3"
+            aria-label="Main"
+          >
+            {nav.map(({ href, label, icon }) =>
+              renderNavLink({ href, label, icon }),
+            )}
+          </nav>
+        )}
+      </div>
+
+      <div className="shrink-0 border-t border-shell-sidebar-border">
         <button
           type="button"
-          onClick={() => void handleLogout()}
-          className="mt-3 w-full rounded-lg py-2.5 text-sm font-medium text-muted transition hover:bg-shell-sidebar-accent hover:text-foreground"
+          onClick={() => setFooterOpen((v) => !v)}
+          aria-expanded={footerOpen}
+          className="flex w-full items-center gap-2 px-4 py-3 text-start transition hover:bg-shell-sidebar-accent"
         >
-          {messages.logout}
+          <svg
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className={`h-4 w-4 shrink-0 text-muted transition-transform duration-200 ${
+              footerOpen ? "rotate-180" : ""
+            }`}
+            aria-hidden
+          >
+            <path
+              fillRule="evenodd"
+              d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+              clipRule="evenodd"
+            />
+          </svg>
+          <span className="min-w-0 flex-1 text-xs font-bold text-shell-sidebar-foreground">
+            {messages.sidebarQuickActions}
+          </span>
         </button>
+        {footerOpen ? (
+          <div className="space-y-2 px-4 pb-4">
+            <Link
+              href={`${prefix}/stores/new`}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-md transition hover:brightness-110"
+            >
+              <span className="text-lg leading-none">+</span>
+              {messages.addStore}
+            </Link>
+            <Link
+              href={`${prefix}/suppliers/new`}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-shell-sidebar-border bg-shell-sidebar px-4 py-2.5 text-sm font-semibold text-primary transition hover:bg-shell-sidebar-accent"
+            >
+              <span className="text-lg leading-none">+</span>
+              {messages.addSupplierShort}
+            </Link>
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              className="w-full rounded-lg py-2.5 text-sm font-medium text-muted transition hover:bg-shell-sidebar-accent hover:text-foreground"
+            >
+              {messages.logout}
+            </button>
+          </div>
+        ) : null}
       </div>
     </aside>
   );
@@ -292,7 +390,7 @@ export function AppShell({ locale, messages, children }: Props) {
       <div
         className={`${
           mobileOpen
-            ? "fixed inset-y-0 start-0 z-50 flex max-h-dvh w-[min(17.5rem,calc(100vw-1.5rem))]"
+            ? `fixed inset-y-0 start-0 z-50 flex max-h-dvh ${supplierNav ? "w-[min(18rem,calc(100vw-1.5rem))]" : "w-[min(17.5rem,calc(100vw-1.5rem))]"}`
             : "hidden"
         } md:sticky md:top-0 md:z-auto md:flex md:h-dvh`}
       >

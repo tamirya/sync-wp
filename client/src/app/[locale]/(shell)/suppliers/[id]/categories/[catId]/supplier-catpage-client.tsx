@@ -14,11 +14,11 @@ import {
   PriceOverrideModal,
   type PriceOverrideModalMessages,
 } from "@/components/price-override-modal";
+import { PriceMarkupBadge } from "@/components/price-markup-badge";
 import {
   effectiveProductPrice,
-  formatMarkupLabel,
   parsePriceString,
-  previewPriceWithMarkup,
+  previewPriceWithOverride,
   type PriceOverride,
 } from "@/lib/price-utils";
 
@@ -76,6 +76,8 @@ type Messages = {
   selectionPanelEmpty: string;
   syncToStoreButton: string;
   priceOverrideButton: string;
+  mappingProductPrice: string;
+  priceOverrideIncludeSalePrices: string;
 } & SyncToStoreModalMessages &
   PriceOverrideModalMessages;
 
@@ -161,6 +163,7 @@ function SubCatCard({
   const [localOverride, setLocalOverride] = useState<PriceOverride | null>(
     sub.priceOverride ?? null,
   );
+
   const imgSrc =
     sub.image?.src ??
     (Array.isArray(sub.images) ? sub.images[0]?.src : null) ??
@@ -218,9 +221,9 @@ function SubCatCard({
           </p>
         </Link>
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
           {sub.displayCount !== null ? (
-            <div className="flex items-baseline gap-1">
+            <div className="flex min-w-0 items-baseline gap-1">
               <span className="text-xl font-bold text-primary leading-none">
                 {sub.displayCount.toLocaleString()}
               </span>
@@ -228,42 +231,24 @@ function SubCatCard({
                 {messages.storeCategoryProducts}
               </span>
             </div>
-          ) : (
-            <span />
-          )}
-          {localOverride && (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200">
-              {formatMarkupLabel(localOverride.markupPercent)}
-            </span>
-          )}
-          <Link
-            href={sub.href}
-            tabIndex={-1}
-            aria-hidden
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary transition-all group-hover:bg-primary group-hover:text-white"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              className="h-3.5 w-3.5 shrink-0 rtl:rotate-180"
-              aria-hidden
-            >
-              <path
-                d="M9 18l6-6-6-6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </Link>
+          ) : null}
         </div>
 
+        {localOverride ? (
+          <PriceMarkupBadge
+            override={localOverride}
+            priceLabel={messages.mappingProductPrice}
+            salePricesHint={messages.priceOverrideIncludeSalePrices}
+            onEdit={() => setOverrideModalOpen(true)}
+            editAriaLabel={messages.priceOverrideEditAria}
+          />
+        ) : null}
+
         {/* Select + price override buttons */}
-        <div className="mt-auto flex gap-2">
+        <div className="mt-auto flex items-center justify-end gap-2">
           <button
             onClick={onToggle}
-            className={`flex-1 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+            className={`h-8 shrink-0 rounded-lg px-3 text-xs font-semibold transition-all ${
               isSelected
                 ? "bg-primary text-white shadow-sm hover:bg-primary/90"
                 : "border border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
@@ -274,20 +259,19 @@ function SubCatCard({
           >
             {isSelected ? messages.selectedLabel : messages.selectLabel}
           </button>
-          <button
-            onClick={() => setOverrideModalOpen(true)}
-            title={messages.priceOverrideButton}
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border transition-all ${
-              localOverride
-                ? "border-amber-400 bg-amber-50 text-amber-600 hover:bg-amber-100"
-                : "border-border bg-card text-muted hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-            }`}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
-              <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" />
-              <path d="M12 6v6l4 2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
+          {!localOverride ? (
+            <button
+              onClick={() => setOverrideModalOpen(true)}
+              title={messages.priceOverrideButton}
+              aria-label={messages.priceOverrideButton}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -304,6 +288,7 @@ function SubCatCard({
           setLocalOverride(override);
           onOverrideSaved?.(sub.id, override);
         }}
+        onRemoved={() => setLocalOverride(null)}
       />
     </div>
   );
@@ -331,6 +316,7 @@ function ProductCard({
   const [localOverride, setLocalOverride] = useState<PriceOverride | null>(
     product.priceOverride ?? null,
   );
+
   const imgSrc = product.image?.src ?? null;
   const imgAlt = product.image?.alt || product.name;
   const hasSale =
@@ -389,35 +375,45 @@ function ProductCard({
           </div>
 
           {localOverride ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-base font-bold text-amber-600">
-                {formatMarkupLabel(localOverride.markupPercent)}
-              </span>
-              {previewPriceWithMarkup(
+            <div className="space-y-1.5">
+              <PriceMarkupBadge
+                override={localOverride}
+                priceLabel={messages.mappingProductPrice}
+                salePricesHint={messages.priceOverrideIncludeSalePrices}
+                onEdit={() => setOverrideModalOpen(true)}
+                editAriaLabel={messages.priceOverrideEditAria}
+              />
+              {previewPriceWithOverride(
                 effectiveProductPrice(
                   {
                     regularPrice: parsePriceString(product.regularPrice),
                     salePrice: parsePriceString(product.salePrice),
-                    displayPrice: parsePriceString(product.price ?? product.regularPrice),
+                    displayPrice: parsePriceString(
+                      product.price ?? product.regularPrice,
+                    ),
                   },
                   localOverride.useSalePrices,
                 ),
-                localOverride.markupPercent,
+                localOverride,
               ) && (
-                <span className="text-sm text-muted">
-                  →{" "}
-                  {previewPriceWithMarkup(
-                    effectiveProductPrice(
-                      {
-                        regularPrice: parsePriceString(product.regularPrice),
-                        salePrice: parsePriceString(product.salePrice),
-                        displayPrice: parsePriceString(product.price ?? product.regularPrice),
-                      },
-                      localOverride.useSalePrices,
-                    ),
-                    localOverride.markupPercent,
-                  )}
-                </span>
+                <p className="text-xs text-muted">
+                  {messages.priceOverridePreviewLabel}:{" "}
+                  <span dir="ltr" className="font-semibold text-foreground">
+                    {previewPriceWithOverride(
+                      effectiveProductPrice(
+                        {
+                          regularPrice: parsePriceString(product.regularPrice),
+                          salePrice: parsePriceString(product.salePrice),
+                          displayPrice: parsePriceString(
+                            product.price ?? product.regularPrice,
+                          ),
+                        },
+                        localOverride.useSalePrices,
+                      ),
+                      localOverride,
+                    )}
+                  </span>
+                </p>
               )}
             </div>
           ) : (product.price ?? product.regularPrice) && (
@@ -482,10 +478,10 @@ function ProductCard({
             )}
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex items-center justify-end gap-2">
             <button
               onClick={onToggle}
-              className={`flex-1 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+              className={`h-8 shrink-0 rounded-lg px-3 text-xs font-semibold transition-all ${
                 isSelected
                   ? "bg-primary text-white shadow-sm hover:bg-primary/90"
                   : "border border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
@@ -493,20 +489,19 @@ function ProductCard({
             >
               {isSelected ? messages.selectedLabel : messages.selectLabel}
             </button>
-            <button
-              onClick={() => setOverrideModalOpen(true)}
-              title={messages.priceOverrideButton}
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border transition-all ${
-                localOverride
-                  ? "border-amber-400 bg-amber-50 text-amber-600 hover:bg-amber-100"
-                  : "border-border bg-card text-muted hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-              }`}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
+            {!localOverride ? (
+              <button
+                onClick={() => setOverrideModalOpen(true)}
+                title={messages.priceOverrideButton}
+                aria-label={messages.priceOverrideButton}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -527,6 +522,7 @@ function ProductCard({
           setLocalOverride(override);
           onOverrideSaved?.(product.id, override);
         }}
+        onRemoved={() => setLocalOverride(null)}
       />
     </div>
   );

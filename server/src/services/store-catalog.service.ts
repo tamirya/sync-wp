@@ -13,7 +13,7 @@ import { HttpException } from '@exceptions/HttpException';
 import StoreCatalogModel from '@models/storeCatalog.model';
 import SupplierCatalogModel from '@models/supplierCatalog.model';
 import PriceOverrideService, { PriceOverrideResolver, PriceOverrideResult } from '@services/priceOverride.service';
-import { applyMarkupPercent, buildMarkedUpWooPrices, normalizePricesFromCatalogPayload } from '@utils/price-markup';
+import { buildMarkedUpWooPrices, normalizePricesFromCatalogPayload } from '@utils/price-markup';
 
 const priceOverrideService = new PriceOverrideService();
 

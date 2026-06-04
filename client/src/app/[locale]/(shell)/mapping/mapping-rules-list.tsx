@@ -365,8 +365,11 @@ function CategoryRuleRow({
           )}
         </span>
         <div className="flex flex-wrap items-center gap-1.5">
-          {overridePrice && (
-            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-300">
+          {overridePrice != null && (
+            <span
+              dir="ltr"
+              className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-300"
+            >
               {messages.mappingProductPrice}: {overridePrice}
             </span>
           )}

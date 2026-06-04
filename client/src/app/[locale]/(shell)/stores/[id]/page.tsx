@@ -7,6 +7,11 @@ import CategoryManageClient, {
   CategoryCardWrapper,
   type CategoryItem,
 } from "./category-manage-client";
+import {
+  StoreCategorySyncRules,
+  type StoreCategorySyncRuleRef,
+} from "@/components/store-category-sync-rules";
+import { parseStoreCategorySyncRules } from "@/lib/store-category-sync-rules-parse";
 
 type CategoryImage = {
   src?: string | null;
@@ -18,6 +23,7 @@ type Category = CategoryItem & {
   image?: CategoryImage | null;
   /** WC Store API: array of images */
   images?: CategoryImage[] | null;
+  syncRules?: StoreCategorySyncRuleRef[];
 };
 
 type Store = {
@@ -56,8 +62,12 @@ async function fetchCategories(
   try {
     const res = await backendFetch(`/stores/${id}/categories`);
     if (!res.ok) return { ok: false };
-    const json = (await res.json()) as { data?: Category[] };
-    return { ok: true, categories: json.data ?? [] };
+    const json = (await res.json()) as { data?: Record<string, unknown>[] };
+    const categories = (json.data ?? []).map((row) => ({
+      ...(row as Category),
+      syncRules: parseStoreCategorySyncRules(row),
+    }));
+    return { ok: true, categories };
   } catch {
     return { ok: false };
   }
@@ -112,17 +122,20 @@ function CategoryCard({
   parentName,
   messages,
   href,
+  locale,
   displayCount,
 }: {
   category: Category;
   parentName: string | null;
   messages: ReturnType<typeof getAppMessages>;
   href: string;
+  locale: string;
   displayCount?: number | null;
 }) {
   const isRoot = category.parent === 0;
   const count =
     displayCount !== undefined ? displayCount : (category.count ?? null);
+  const syncRules = category.syncRules ?? [];
   const imgSrc =
     category.image?.src ??
     (Array.isArray(category.images) ? category.images[0]?.src : null) ??
@@ -134,86 +147,96 @@ function CategoryCard({
   const gradient = CARD_GRADIENTS[category.id % CARD_GRADIENTS.length];
 
   return (
-    <Link
-      href={href}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-all duration-200 hover:shadow-lg hover:border-primary/30"
-    >
-      {/* Thumbnail */}
-      <div
-        className={`relative h-32 w-full shrink-0 overflow-hidden bg-gradient-to-br ${gradient}`}
-      >
-        {imgSrc ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={imgSrc}
-            alt={imgAlt}
-            className="h-full w-full object-cover opacity-90"
-          />
-        ) : (
-          <>
-            {/* Decorative circles */}
-            <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/10" />
-            <div className="absolute -left-3 bottom-0 h-14 w-14 rounded-full bg-white/10" />
-            <div className="flex h-full w-full items-center justify-center">
+    <div className="group flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-all duration-200 hover:shadow-lg hover:border-primary/30">
+      <Link href={href} className="flex flex-1 flex-col">
+        {/* Thumbnail */}
+        <div
+          className={`relative h-32 w-full shrink-0 overflow-hidden bg-gradient-to-br ${gradient}`}
+        >
+          {imgSrc ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={imgSrc}
+              alt={imgAlt}
+              className="h-full w-full object-cover opacity-90"
+            />
+          ) : (
+            <>
+              {/* Decorative circles */}
+              <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/10" />
+              <div className="absolute -left-3 bottom-0 h-14 w-14 rounded-full bg-white/10" />
+              <div className="flex h-full w-full items-center justify-center">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="1.25"
+                  className="h-12 w-12 opacity-90 drop-shadow-sm"
+                  aria-hidden
+                >
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                </svg>
+              </div>
+            </>
+          )}
+          {/* Root / sub badge on image */}
+          <span className="absolute left-2.5 top-2.5 rounded-full bg-black/25 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+            {isRoot
+              ? messages.storeCategoryRoot
+              : (parentName ?? messages.storeCategoryParent)}
+          </span>
+        </div>
+
+        {/* Body */}
+        <div className="flex flex-1 flex-col gap-2 p-4">
+          <h3 className="line-clamp-1 text-sm font-bold text-card-foreground group-hover:text-primary transition-colors">
+            {category.name}
+          </h3>
+
+          <div className="mt-auto flex items-center justify-between pt-1">
+            {count !== null ? (
+              <div className="flex items-baseline gap-1">
+                <span className="text-xl font-bold text-primary leading-none">
+                  {count.toLocaleString()}
+                </span>
+                <span className="text-[11px] text-muted">
+                  {messages.storeCategoryProducts}
+                </span>
+              </div>
+            ) : (
+              <span />
+            )}
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary transition-all group-hover:bg-primary group-hover:text-white">
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="white"
-                strokeWidth="1.25"
-                className="h-12 w-12 opacity-90 drop-shadow-sm"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                className="h-3.5 w-3.5 shrink-0 rtl:rotate-180"
                 aria-hidden
               >
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                <path
+                  d="M9 18l6-6-6-6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </div>
-          </>
-        )}
-        {/* Root / sub badge on image */}
-        <span className="absolute left-2.5 top-2.5 rounded-full bg-black/25 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
-          {isRoot
-            ? messages.storeCategoryRoot
-            : (parentName ?? messages.storeCategoryParent)}
-        </span>
-      </div>
-
-      {/* Body */}
-      <div className="flex flex-1 flex-col gap-2 p-4">
-        <h3 className="line-clamp-1 text-sm font-bold text-card-foreground group-hover:text-primary transition-colors">
-          {category.name}
-        </h3>
-
-        <div className="mt-auto flex items-center justify-between pt-1">
-          {count !== null ? (
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl font-bold text-primary leading-none">
-                {count.toLocaleString()}
-              </span>
-              <span className="text-[11px] text-muted">
-                {messages.storeCategoryProducts}
-              </span>
-            </div>
-          ) : (
-            <span />
-          )}
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary transition-all group-hover:bg-primary group-hover:text-white">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              className="h-3.5 w-3.5 shrink-0 rtl:rotate-180"
-              aria-hidden
-            >
-              <path
-                d="M9 18l6-6-6-6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
           </div>
         </div>
-      </div>
-    </Link>
+      </Link>
+
+      {syncRules.length > 0 && (
+        <div className="border-t border-border/50 px-4 pb-4 pt-3">
+          <StoreCategorySyncRules
+            rules={syncRules}
+            locale={locale}
+            messages={messages}
+            compact
+          />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -389,6 +412,7 @@ export default async function StoreCategoriesPage({ params }: Props) {
                           : null
                       }
                       messages={messages}
+                      locale={locale}
                       href={`/${locale}/stores/${id}/categories/${cat.id}`}
                       displayCount={totalCount(cat.id)}
                     />

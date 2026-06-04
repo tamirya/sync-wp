@@ -13,6 +13,7 @@ export type AppMessages = {
   userProfile: string;
   userRole: string;
   logout: string;
+  sidebarQuickActions: string;
   topBarDocs: string;
   topBarSupport: string;
   searchPlaceholder: string;
@@ -131,6 +132,8 @@ export type AppMessages = {
   supplierSyncing: string;
   priceOverrideButton: string;
   priceOverrideModalTitle: string;
+  priceOverrideTargetCategory: string;
+  priceOverrideTargetProduct: string;
   priceOverrideSupplierPrice: string;
   priceOverrideSupplierPriceMin: string;
   priceOverrideIncludeSalePrices: string;
@@ -140,11 +143,22 @@ export type AppMessages = {
   priceOverridePreviewLabel: string;
   priceOverrideMarkup10: string;
   priceOverrideMarkup20: string;
+  priceOverrideModePercent: string;
+  priceOverrideModeFixedAmount: string;
+  priceOverrideFixedAmountLabel: string;
+  priceOverrideFixedAmount5: string;
+  priceOverrideFixedAmountMinus5: string;
   priceOverrideSave: string;
   priceOverrideCancel: string;
   priceOverrideSaving: string;
   priceOverrideSaved: string;
   priceOverrideError: string;
+  priceOverrideRemove: string;
+  priceOverrideRemoving: string;
+  priceOverrideRemoved: string;
+  priceOverrideRemoveConfirm: string;
+  priceOverrideEditAria: string;
+  priceOverrideRemoveAria: string;
   syncSuccessAlert: string;
   syncFailedAlert: string;
   clearWooProducts: string;
@@ -192,6 +206,17 @@ export type AppMessages = {
   storeProductOutOfStock: string;
   storeProductInStock: string;
   storeProductOnBackorder: string;
+  storeProductSyncedFrom: string;
+  storeProductSupplierPrice: string;
+  storeProductSyncRuleProduct: string;
+  storeProductSyncRuleCategory: string;
+  storeProductSyncRuleActive: string;
+  storeProductSyncRuleDisabled: string;
+  storeProductSyncRuleDisabledShort: string;
+  storeCategoryMappedFrom: string;
+  storeCategorySyncSourceCategory: string;
+  storeCategorySyncSourceProduct: string;
+  storeCategorySyncSourceUnknown: string;
   editLabel: string;
   supplierCategoriesTitle: string;
   supplierCategoriesSubtitle: string;
@@ -200,6 +225,10 @@ export type AppMessages = {
   supplierPageLoading: string;
   supplierCategoriesEmpty: string;
   supplierCategoriesLoadError: string;
+  supplierNavAllCategories: string;
+  supplierNavBackToList: string;
+  supplierNavCategoriesAria: string;
+  supplierNavLoading: string;
   supplierCategoryProductsViewLabel: string;
   storeCategorySubcategoriesTitle: string;
   selectLabel: string;
@@ -236,6 +265,7 @@ const he: AppMessages = {
   userProfile: "פרופיל משתמש",
   userRole: "גישת מנהל",
   logout: "התנתקות",
+  sidebarQuickActions: "פעולות מהירות",
   topBarDocs: "תיעוד",
   topBarSupport: "תמיכה",
   searchPlaceholder: "חיפוש מוצרים…",
@@ -347,6 +377,8 @@ const he: AppMessages = {
   supplierSyncing: "מסנכרן…",
   priceOverrideButton: "שנה מחיר",
   priceOverrideModalTitle: "קביעת תוספת מחיר",
+  priceOverrideTargetCategory: "קטגוריה",
+  priceOverrideTargetProduct: "מוצר",
   priceOverrideSupplierPrice: "מחיר ספק",
   priceOverrideSupplierPriceMin: "מחיר ספק (מינימום בקטגוריה)",
   priceOverrideIncludeSalePrices: "כלול מחירי מבצע של הספק",
@@ -356,11 +388,22 @@ const he: AppMessages = {
   priceOverridePreviewLabel: "דוגמה (מינימום)",
   priceOverrideMarkup10: "+10%",
   priceOverrideMarkup20: "+20%",
+  priceOverrideModePercent: "אחוזים",
+  priceOverrideModeFixedAmount: "סכום קבוע",
+  priceOverrideFixedAmountLabel: "תוספת/הפחתה בש\"ח",
+  priceOverrideFixedAmount5: "+₪5",
+  priceOverrideFixedAmountMinus5: "−₪5",
   priceOverrideSave: "שמירה",
   priceOverrideCancel: "ביטול",
   priceOverrideSaving: "שומר…",
   priceOverrideSaved: "נשמר",
   priceOverrideError: "שגיאה בשמירה",
+  priceOverrideRemove: "הסר עקיפת מחיר",
+  priceOverrideRemoving: "מסיר…",
+  priceOverrideRemoved: "הוסר",
+  priceOverrideRemoveConfirm: "להסיר את עקיפת המחיר לקטגוריה/מוצר זה?",
+  priceOverrideEditAria: "ערוך עקיפת מחיר",
+  priceOverrideRemoveAria: "הסר עקיפת מחיר",
   syncSuccessAlert: "הסנכרון הושלם בהצלחה",
   syncFailedAlert: "הסנכרון נכשל:",
   clearWooProducts: "מחיקת כל המוצרים מהחנות",
@@ -412,6 +455,17 @@ const he: AppMessages = {
   storeProductOutOfStock: "אזל מהמלאי",
   storeProductInStock: "במלאי",
   storeProductOnBackorder: "בהזמנה",
+  storeProductSyncedFrom: "מסונכרן מ:",
+  storeProductSupplierPrice: "מחיר ספק",
+  storeProductSyncRuleProduct: "חוק מוצר",
+  storeProductSyncRuleCategory: "חוק קטגוריה",
+  storeProductSyncRuleActive: "חוק סנכרון פעיל",
+  storeProductSyncRuleDisabled: "חוק סנכרון מושבת",
+  storeProductSyncRuleDisabledShort: "מושבת",
+  storeCategoryMappedFrom: "מיפוי מספק:",
+  storeCategorySyncSourceCategory: "קטגוריה: ",
+  storeCategorySyncSourceProduct: "מוצר: ",
+  storeCategorySyncSourceUnknown: "לא ידוע",
   editLabel: "עריכה",
   supplierCategoriesTitle: "קטגוריות הספק",
   supplierCategoriesSubtitle: "כל קטגוריות המוצרים המסונכרנות מהספק.",
@@ -420,6 +474,10 @@ const he: AppMessages = {
   supplierCategoriesEmpty:
     "אין קטגוריות מסונכרנות עדיין. סנכרן קטגוריות מדף הספקים.",
   supplierCategoriesLoadError: "לא ניתן לטעון קטגוריות. נסה לרענן.",
+  supplierNavAllCategories: "כל הקטגוריות",
+  supplierNavBackToList: "חזרה לרשימת ספקים",
+  supplierNavCategoriesAria: "ניווט קטגוריות ספק",
+  supplierNavLoading: "טוען קטגוריות…",
   supplierCategoryProductsViewLabel: "צפה במוצר",
   storeCategorySubcategoriesTitle: "תת-קטגוריות",
   selectLabel: "בחר",
@@ -456,6 +514,7 @@ const en: AppMessages = {
   userProfile: "User Profile",
   userRole: "Admin Access",
   logout: "Log out",
+  sidebarQuickActions: "Quick actions",
   topBarDocs: "Docs",
   topBarSupport: "Support",
   searchPlaceholder: "Search products…",
@@ -570,6 +629,8 @@ const en: AppMessages = {
   supplierSyncing: "Syncing…",
   priceOverrideButton: "Change price",
   priceOverrideModalTitle: "Set markup",
+  priceOverrideTargetCategory: "Category",
+  priceOverrideTargetProduct: "Product",
   priceOverrideSupplierPrice: "Supplier price",
   priceOverrideSupplierPriceMin: "Supplier price (category min)",
   priceOverrideIncludeSalePrices: "Include supplier sale prices",
@@ -579,11 +640,22 @@ const en: AppMessages = {
   priceOverridePreviewLabel: "Preview (minimum)",
   priceOverrideMarkup10: "+10%",
   priceOverrideMarkup20: "+20%",
+  priceOverrideModePercent: "Percentage",
+  priceOverrideModeFixedAmount: "Fixed amount",
+  priceOverrideFixedAmountLabel: "Add/subtract (₪)",
+  priceOverrideFixedAmount5: "+₪5",
+  priceOverrideFixedAmountMinus5: "−₪5",
   priceOverrideSave: "Save",
   priceOverrideCancel: "Cancel",
   priceOverrideSaving: "Saving…",
   priceOverrideSaved: "Saved",
   priceOverrideError: "Save failed",
+  priceOverrideRemove: "Remove price override",
+  priceOverrideRemoving: "Removing…",
+  priceOverrideRemoved: "Removed",
+  priceOverrideRemoveConfirm: "Remove the price override for this category/product?",
+  priceOverrideEditAria: "Edit price override",
+  priceOverrideRemoveAria: "Remove price override",
   syncSuccessAlert: "Sync completed successfully",
   syncFailedAlert: "Sync failed:",
   clearWooProducts: "Delete all products from store",
@@ -635,6 +707,17 @@ const en: AppMessages = {
   storeProductOutOfStock: "Out of stock",
   storeProductInStock: "In stock",
   storeProductOnBackorder: "On backorder",
+  storeProductSyncedFrom: "Synced from:",
+  storeProductSupplierPrice: "Supplier price",
+  storeProductSyncRuleProduct: "Product rule",
+  storeProductSyncRuleCategory: "Category rule",
+  storeProductSyncRuleActive: "Active sync rule",
+  storeProductSyncRuleDisabled: "Disabled sync rule",
+  storeProductSyncRuleDisabledShort: "off",
+  storeCategoryMappedFrom: "Mapped from:",
+  storeCategorySyncSourceCategory: "Category: ",
+  storeCategorySyncSourceProduct: "Product: ",
+  storeCategorySyncSourceUnknown: "Unknown",
   editLabel: "Edit",
   supplierCategoriesTitle: "Supplier categories",
   supplierCategoriesSubtitle:
@@ -644,6 +727,10 @@ const en: AppMessages = {
   supplierCategoriesEmpty:
     "No synced categories yet. Sync categories from the suppliers page.",
   supplierCategoriesLoadError: "Could not load categories. Try refreshing.",
+  supplierNavAllCategories: "All categories",
+  supplierNavBackToList: "Back to suppliers list",
+  supplierNavCategoriesAria: "Supplier category navigation",
+  supplierNavLoading: "Loading categories…",
   supplierCategoryProductsViewLabel: "View product",
   storeCategorySubcategoriesTitle: "Sub-categories",
   selectLabel: "Select",
@@ -676,6 +763,8 @@ export function getAppMessages(locale: Locale): AppMessages {
 export function pickPriceOverrideMessages(m: AppMessages) {
   return {
     priceOverrideModalTitle: m.priceOverrideModalTitle,
+    priceOverrideTargetCategory: m.priceOverrideTargetCategory,
+    priceOverrideTargetProduct: m.priceOverrideTargetProduct,
     priceOverrideSupplierPrice: m.priceOverrideSupplierPrice,
     priceOverrideSupplierPriceMin: m.priceOverrideSupplierPriceMin,
     priceOverrideIncludeSalePrices: m.priceOverrideIncludeSalePrices,
@@ -685,10 +774,23 @@ export function pickPriceOverrideMessages(m: AppMessages) {
     priceOverridePreviewLabel: m.priceOverridePreviewLabel,
     priceOverrideMarkup10: m.priceOverrideMarkup10,
     priceOverrideMarkup20: m.priceOverrideMarkup20,
+    priceOverrideModePercent: m.priceOverrideModePercent,
+    priceOverrideModeFixedAmount: m.priceOverrideModeFixedAmount,
+    priceOverrideFixedAmountLabel: m.priceOverrideFixedAmountLabel,
+    priceOverrideFixedAmount5: m.priceOverrideFixedAmount5,
+    priceOverrideFixedAmountMinus5: m.priceOverrideFixedAmountMinus5,
     priceOverrideSave: m.priceOverrideSave,
     priceOverrideCancel: m.priceOverrideCancel,
     priceOverrideSaving: m.priceOverrideSaving,
     priceOverrideSaved: m.priceOverrideSaved,
     priceOverrideError: m.priceOverrideError,
+    priceOverrideRemove: m.priceOverrideRemove,
+    priceOverrideRemoving: m.priceOverrideRemoving,
+    priceOverrideRemoved: m.priceOverrideRemoved,
+    priceOverrideRemoveConfirm: m.priceOverrideRemoveConfirm,
+    priceOverrideEditAria: m.priceOverrideEditAria,
+    priceOverrideRemoveAria: m.priceOverrideRemoveAria,
+    confirmYes: m.confirmYes,
+    confirmNo: m.confirmNo,
   };
 }

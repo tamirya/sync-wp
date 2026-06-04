@@ -11,6 +11,13 @@ import {
   type SupplierProductInfo,
 } from "@/lib/mapping-api";
 import { backendFetch } from "@/lib/backend-fetch";
+import {
+  buildCategoryChildrenMap,
+  buildCategoryParentMap,
+  formatPriceOverrideLabel,
+  normalizePriceOverride,
+  resolveCategoryOverrideLabel,
+} from "@/lib/price-utils";
 import { fetchStoresForUser } from "@/lib/stores-api";
 import { fetchSuppliersForUser } from "@/lib/suppliers-api";
 import { getAppMessages } from "@/messages/app";
@@ -86,7 +93,9 @@ export default async function MappingPage({ params }: Props) {
   type PriceOverrideEntry = {
     type: string;
     targetId: number;
+    pricingMode?: "percent" | "fixed_amount";
     markupPercent: number;
+    fixedAmount?: number | null;
     useSalePrices: boolean;
   };
 
@@ -108,8 +117,7 @@ export default async function MappingPage({ params }: Props) {
       if (!res.ok) return { supplierId, products, categories };
       const json = (await res.json()) as { data?: PriceOverrideEntry[] };
       for (const o of json.data ?? []) {
-        const pct = Number(o.markupPercent);
-        const label = pct > 0 ? `+${pct}%` : `${pct}%`;
+        const label = formatPriceOverrideLabel(normalizePriceOverride(o));
         if (o.type === "product") products.set(o.targetId, label);
         else if (o.type === "category") categories.set(o.targetId, label);
       }
@@ -135,17 +143,20 @@ export default async function MappingPage({ params }: Props) {
       Promise.all(rulesSupplierIds.map((id) => fetchOverridesForSupplier(id))),
     ]);
 
-  // Build lookups: `${supplierId}_${id}` → formatted price string
+  // Build lookups: `${supplierId}_${id}` → formatted price string (direct overrides)
   const productPriceOverrideMap = new Map<string, string>();
-  const categoryPriceOverrideMap = new Map<string, string>();
+  const directCategoryOverrideMap = new Map<string, string>();
   for (const { supplierId, products, categories } of overrideResults) {
     for (const [productId, price] of products) {
       productPriceOverrideMap.set(`${supplierId}_${productId}`, price);
     }
     for (const [categoryId, price] of categories) {
-      categoryPriceOverrideMap.set(`${supplierId}_${categoryId}`, price);
+      directCategoryOverrideMap.set(`${supplierId}_${categoryId}`, price);
     }
   }
+
+  const supplierCategoryParentMap = new Map<number, Map<number, number>>();
+  const supplierCategoryChildrenMap = new Map<number, Map<number, number[]>>();
 
   const storeCategoryMap: Record<number, string> = {};
   for (const r of storeCatResults) {
@@ -154,18 +165,20 @@ export default async function MappingPage({ params }: Props) {
 
   const supplierCategoryMap: Record<number, string> = {};
   const supplierCategoryCountMap: Record<number, number> = {};
-  for (const r of supplierCatResults) {
+  for (let i = 0; i < supplierCatResults.length; i++) {
+    const supplierId = rulesSupplierIds[i];
+    const r = supplierCatResults[i];
     if (r.ok) {
       const cats = r.categories;
       cats.forEach((c) => { supplierCategoryMap[c.id] = c.name; });
+      supplierCategoryParentMap.set(supplierId, buildCategoryParentMap(cats));
+      supplierCategoryChildrenMap.set(
+        supplierId,
+        buildCategoryChildrenMap(cats),
+      );
 
       /* Recursive total count (self + all descendants) */
-      const childrenByParent = new Map<number, number[]>();
-      for (const cat of cats) {
-        const arr = childrenByParent.get(cat.parent) ?? [];
-        arr.push(cat.id);
-        childrenByParent.set(cat.parent, arr);
-      }
+      const childrenByParent = supplierCategoryChildrenMap.get(supplierId)!;
       const selfCount = new Map(cats.map((c) => [c.id, c.count ?? 0]));
       function totalCount(id: number): number {
         const children = childrenByParent.get(id) ?? [];
@@ -175,6 +188,27 @@ export default async function MappingPage({ params }: Props) {
       for (const cat of cats) {
         supplierCategoryCountMap[cat.id] = totalCount(cat.id);
       }
+    }
+  }
+
+  const categoryPriceOverrideMap = new Map<string, string>();
+  for (const rule of mappingRules) {
+    const parentMap = supplierCategoryParentMap.get(rule.supplierId);
+    const childrenMap = supplierCategoryChildrenMap.get(rule.supplierId);
+    if (!parentMap || !childrenMap) continue;
+
+    const label = resolveCategoryOverrideLabel(
+      rule.supplierId,
+      rule.supplierCategoryId,
+      directCategoryOverrideMap,
+      parentMap,
+      childrenMap,
+    );
+    if (label != null) {
+      categoryPriceOverrideMap.set(
+        `${rule.supplierId}_${rule.supplierCategoryId}`,
+        label,
+      );
     }
   }
 

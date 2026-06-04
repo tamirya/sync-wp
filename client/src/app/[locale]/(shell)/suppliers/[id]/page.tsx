@@ -3,6 +3,7 @@ import { isLocale, type Locale } from "@/i18n/config";
 import { notFound, redirect } from "next/navigation";
 import { backendFetch } from "@/lib/backend-fetch";
 import { getAppMessages, pickPriceOverrideMessages } from "@/messages/app";
+import { normalizePriceOverride, type PriceOverride } from "@/lib/price-utils";
 import {
   SupplierCategoriesClient,
   type ClientCategory,
@@ -73,13 +74,8 @@ export default async function SupplierCategoriesPage({ params }: Props) {
 
   async function fetchCategoryOverrides(
     supplierId: string,
-  ): Promise<
-    Map<number, { markupPercent: number; useSalePrices: boolean }>
-  > {
-    const map = new Map<
-      number,
-      { markupPercent: number; useSalePrices: boolean }
-    >();
+  ): Promise<Map<number, PriceOverride>> {
+    const map = new Map<number, PriceOverride>();
     try {
       const res = await backendFetch(`/suppliers/${supplierId}/price-overrides`);
       if (!res.ok) return map;
@@ -87,16 +83,15 @@ export default async function SupplierCategoriesPage({ params }: Props) {
         data?: Array<{
           type: string;
           targetId: number;
+          pricingMode?: string;
           markupPercent: number;
+          fixedAmount?: number | null;
           useSalePrices: boolean;
         }>;
       };
       for (const o of json.data ?? []) {
         if (o.type === "category") {
-          map.set(o.targetId, {
-            markupPercent: Number(o.markupPercent),
-            useSalePrices: o.useSalePrices !== false,
-          });
+          map.set(o.targetId, normalizePriceOverride(o));
         }
       }
     } catch {}
@@ -272,8 +267,8 @@ export default async function SupplierCategoriesPage({ params }: Props) {
                 syncModalLoadingCategories: messages.syncModalLoadingCategories,
                 syncModalNoStores: messages.syncModalNoStores,
                 syncModalNoCategories: messages.syncModalNoCategories,
-                confirmNo: messages.confirmNo,
                 priceOverrideButton: messages.priceOverrideButton,
+                mappingProductPrice: messages.mappingProductPrice,
                 ...pickPriceOverrideMessages(messages),
               }}
               locale={locale}
